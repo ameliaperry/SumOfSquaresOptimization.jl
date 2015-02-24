@@ -1,5 +1,12 @@
 module SumOfSquaresOptimization
 
-# package code goes here
+using SemidefiniteProgramming
 
-end # module
+export SoS, @constraint, @partobjective, @objective, sossolve
+
+include("monoms.jl")
+include("sos.jl")
+include("solve.jl")
+
+end # module SumOfSquaresOptimization
+
