@@ -76,7 +76,8 @@ function sossolve(sos :: SoS, d :: Int64)
         end
     end
 
-    @printf("SDP with %d^2 entries and %d constraints\n", length(sos.vars), constridx-1)
+    nvars = count_vars(sos, div(d,2))
+    @printf("SDP with %d^2 entries and %d constraints\n", nvars, constridx-1)
     #show(sdp.cons)
 
     # solve
@@ -91,3 +92,10 @@ function sossolve(sos :: SoS, d :: Int64)
     println("Dual:")
     println(dualmatrix(sol))
 end
+
+
+function count_vars(sos :: SoS, deg :: Int64)
+    n = length(sos.vars)
+    sum([ binomial(d+n-1, d) for d in 0:deg])
+end
+
