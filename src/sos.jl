@@ -86,13 +86,14 @@ function addconstraint(sos :: SoS, ex :: Expr)
     #@printf("Original expression: %s\n", ex)
     #@printf("Zeroing polynomial expression: %s\n", polyex)
     poly = parsepoly(sos, polyex)
-    #@printf("Parsed poly: %s\n", poly)
+    #@printf("Adding constraint: %s should be zero\n", poly)
     push!(sos.constraints, poly)
 end
 
 #  Add a polynomial (given in Expr form) to the objective.
 function addobjective(sos :: SoS, ex)
     poly = parsepoly(sos, ex)
+    #@printf("Adding to objective: %s\n", poly)
     sos.objective += poly
 end
 #  Set a polynomial (given in Expr form) as the objective, overwriting what
@@ -126,7 +127,7 @@ macro partobjective(sos,args...)
 end
 
 #  Set a polynomial (given in printf form) as the objective.
-macro partobjective(sos,args...)
+macro objective(sos,args...)
     escargs = [esc(x) for x in args[2:end]]
     quote
         str = @sprintf($(args[1]),$(escargs...))
