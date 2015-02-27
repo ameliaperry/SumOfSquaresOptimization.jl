@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/willperry/SumOfSquaresOptimization.jl.svg?branch=master)](https://travis-ci.org/willperry/SumOfSquaresOptimization.jl)
 
-A Julia library to solve sums-of-squares relaxations of polynomial systems.
+A Julia library to solve sums-of-squares relaxations of polynomial systems. This is not yet in the Julia package repository.
 
 ## example
 
