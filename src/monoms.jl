@@ -153,6 +153,6 @@ function decomp1(mon :: SoSMonom, degmax :: Int64)
         end
     end
 
-    list
+    throw(Error("No monomial decompositions found! Some degree must be off. Please report this bug."))
 end
 
