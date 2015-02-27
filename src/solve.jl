@@ -92,14 +92,7 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
 
     # solve
     sol = solve(sdp, solverinst)
-
-    # TODO package this in some way
-    println("Objective:")
-    println(obj(sol))
-    println("Primal:")
-    println(primalmatrix(sol))
-    println("Dual:")
-    println(dualmatrix(sol))
+    SoSSolution(d, sol)
 end
 
 

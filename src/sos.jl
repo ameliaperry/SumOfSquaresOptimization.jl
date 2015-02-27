@@ -36,18 +36,24 @@ function monoms(sos :: SoS, d :: Int64)
 end
 
 
+typealias Maybe{T} Union(T,Nothing)
+
+
 
 
 #  Parse a polynomial (in Expr form) into a SoSPoly, by traversing
 #    a Julia syntax tree.
-function parsepoly(sos::SoS, ex::Symbol)
-    push!(sos.vars, ex)
+function parsepoly(sos :: Maybe{SoS}, ex::Symbol)
+    if(sos != nothing)
+        push!(sos.vars, ex)
+    end
+
     return [[ex => 1] => 1.0] :: SoSPoly
 end
-function parsepoly{T<:Number}(sos::SoS, ex::T)
+function parsepoly{T<:Number}(sos :: Maybe{SoS}, ex :: T)
     return [(Symbol=>Int64)[] => convert(Float64, ex)] :: SoSPoly
 end
-function parsepoly(sos::SoS, ex::Expr)
+function parsepoly(sos :: Maybe{SoS}, ex :: Expr)
     if(ex.head == :call)
         if(ex.args[1] == :(+))
             return parsepoly(sos,ex.args[2]) + parsepoly(sos,ex.args[3])
