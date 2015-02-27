@@ -14,10 +14,9 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
         throw(ArgumentError("Degree must be even"))
     end
 
-    # TODO choice of min / max
-    sdp = SparseSDP(maximize=false)
     
-    # set up solver instance
+    # set up problem & solver instance
+    sdp = SparseSDP(maximize=sos.maximize)
     if (solver == "sdpa")
         solverinst = SDPA()
     elseif (solver == "csdp")

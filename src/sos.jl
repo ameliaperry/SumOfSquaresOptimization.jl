@@ -5,12 +5,21 @@
 #  A system of polynomial equations.
 #    We convert inequalities into equations with slack variables (squared).
 type SoS
-    slackvars::Int  # counter
-    vars::Set{Symbol}  # all variables, including slack variables
-    constraints::Array{SoSPoly}  # polynomials that are constrained to 0
-    objective::SoSPoly
+    slackvars :: Int  # counter
+    vars :: Set{Symbol}  # all variables, including slack variables
+    constraints :: Array{SoSPoly}  # polynomials that are constrained to 0
+    objective :: SoSPoly
+    maximize :: Bool
 end
-SoS() = SoS(0, Set{Symbol}(), [], SoSPoly())
+SoS(; maximize=true, minimize=false) = begin
+    # default to maximize; switch to minimize if there's any sign to do so
+    mx = true
+    if(maximize == false || minimize == true)
+        mx = false
+    end
+    SoS(0, Set{Symbol}(), [], SoSPoly(), mx)
+end
+
 
 #  Generate a new slack variable (a Symbol)
 function slackvar(sos :: SoS)
