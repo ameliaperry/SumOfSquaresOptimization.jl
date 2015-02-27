@@ -3,7 +3,7 @@
 #####################
 
 #  Make the magic happen.
-function sossolve(sos :: SoS, d :: Int64)
+function sossolve(sos :: SoS, d :: Int64; solver="csdp")
 
     # sanity check
     if(d < 0)
@@ -17,9 +17,20 @@ function sossolve(sos :: SoS, d :: Int64)
     # TODO choice of min / max
     sdp = SparseSDP(maximize=false)
     
+    # set up solver instance
+    if (solver == "sdpa")
+        solverinst = SDPA()
+    elseif (solver == "csdp")
+        solverinst = CSDP()
+    else
+        throw(ArgumentError("Unsupported solver."))
+    end
+
+
+    
     ## objective ##
     for (k,v) in sos.objective
-        (k1,k2) = decomp1(k,div(d,2))
+        (k1,k2) = decomp1(k,div(d,2)) # just one representative for each monomial
         #           blk row col val
         setobj!(sdp, 1, k1, k2, v)
     end
@@ -81,8 +92,7 @@ function sossolve(sos :: SoS, d :: Int64)
     #show(sdp.cons)
 
     # solve
-    # TODO choice of solver
-    sol = solve(sdp, CSDP())
+    sol = solve(sdp, solverinst)
 
     # TODO package this in some way
     println("Objective:")
