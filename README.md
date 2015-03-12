@@ -1,6 +1,6 @@
 # SumOfSquaresOptimization
 
-A Julia library to solve sums-of-squares relaxations of polynomial systems. This is not yet in the Julia package repository.
+A Julia library to solve sum-of-squares relaxations of polynomial systems. This is not yet in the Julia package repository.
 
 ## example
 

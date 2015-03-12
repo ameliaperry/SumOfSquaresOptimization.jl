@@ -5,6 +5,10 @@ type SoSSolution
     sdp :: SparseSDPSolution
 end
 
+function sosobj(sol :: SoSSolution)
+    obj(sol.sdp)
+end
+
 function moment(sol :: SoSSolution, monom :: SoSMonom)
 
     if(deg(monom) > sol.degree)

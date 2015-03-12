@@ -4,7 +4,7 @@
 
 #  An SoSMonom represents a monomial: it maps each symbol to its exponent.
 #  Exponents should always be strictly positive (never 0).
-typealias SoSMonom Dict{Symbol,Int}
+typealias SoSMonom Dict{Symbol,Int64}
 
 #  An SoSPoly maps each monomial to its coefficient.
 typealias SoSPoly Dict{SoSMonom,Float64}
