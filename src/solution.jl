@@ -35,13 +35,12 @@ function moment(sol :: SoSSolution, symb :: Symbol)
     moment(sol, parsepoly(nothing, symb))
 end
 
+
 macro moment(sol, args...)
-    @printf("in @moment()\n")
     escargs = [esc(x) for x in args[2:end]]
     quote
         str = @sprintf($(args[1]),$(escargs...))
         moment( $(esc(sol)), parse(str) )
-#        moment( sol, parse(str) )
     end
 end
 
