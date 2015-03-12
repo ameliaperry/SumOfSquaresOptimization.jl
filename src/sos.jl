@@ -126,6 +126,11 @@ function setobjective(sos :: SoS, ex)
     sos.objective = poly
 end
 
+
+function constraint(sos,str)
+    addconstraint( sos, parse(str) )
+end
+
 #  The following three macros are the main user-facing ways to prepare
 #    a SoS program.
 #    This section is `esc` hell and was a pain to figure out.
