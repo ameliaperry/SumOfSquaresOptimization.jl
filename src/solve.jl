@@ -87,11 +87,12 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
     end
 
     nvars = count_vars(sos, div(d,2))
-    @printf("SDP with %d^2 entries and %d constraints\n", nvars, constridx-1)
+    @printf("Solving SDP with %d^2 entries and %d constraints... ", nvars, constridx-1)
     #show(sdp.cons)
 
     # solve
     sol = solve(sdp, solverinst)
+    @printf("done.\n")
     SoSSolution(d, sol)
 end
 
