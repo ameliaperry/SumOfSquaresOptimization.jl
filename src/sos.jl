@@ -56,9 +56,17 @@ end
 function parsepoly(sos :: Maybe{SoS}, ex :: Expr)
     if(ex.head == :call)
         if(ex.args[1] == :(+))
-            return parsepoly(sos,ex.args[2]) + parsepoly(sos,ex.args[3])
+            ret = parsepoly(sos,ex.args[2])
+            for i in 3:length(ex.args)
+                ret += parsepoly(sos,ex.args[i])
+            end
+            return ret
         elseif(ex.args[1] == :(*))
-            return parsepoly(sos,ex.args[2]) * parsepoly(sos,ex.args[3])
+            ret = parsepoly(sos,ex.args[2])
+            for i in 3:length(ex.args)
+                ret *= parsepoly(sos,ex.args[i])
+            end
+            return ret
         elseif(ex.args[1] == :(-))
             if(length(ex.args) == 2) # unary minus
                 return parsepoly(sos, :( (-1) * $(ex.args[2]) ))
