@@ -31,7 +31,7 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
     for (k,v) in sos.objective
         (k1,k2) = decomp1(k,div(d,2)) # just one representative for each monomial
         #           blk row col val
-        setobj!(sdp, 1, k1, k2, v)
+        setobj!(sdp, 1, k1, k2, (k1 == k2 ? v : v/2))
     end
 
 
@@ -55,8 +55,8 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
                     continue
                 end
                 #@printf("symmetry: %s is %s\n", (a,b), (a1,b1))
-                setcon!(sdp,constridx, 1, a, b, 1.0)
-                setcon!(sdp,constridx, 1,a1,b1,-1.0)
+                setcon!(sdp,constridx, 1, a, b, (a == b ? 1.0 : 0.5))
+                setcon!(sdp,constridx, 1,a1,b1, (a1 == b1 ? -1.0 : -0.5))
                 setrhs!(sdp,constridx,0.0)
                 constridx += 1
             end
@@ -76,9 +76,9 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
             for monom in monoms(sos,promdeg)
 
                 for (k,v) in poly
-                    (k1,k2) = decomp1(k * monom,div(d,2))
+                    (k1,k2) = decomp1(k * monom, div(d,2))
                     #                     blk row col val
-                    setcon!(sdp, constridx, 1, k1, k2, v)
+                    setcon!(sdp, constridx, 1, k1, k2, (k1 == k2 ? v : v/2))
                 end
                 setrhs!(sdp, constridx, 0.0)
                 constridx += 1
