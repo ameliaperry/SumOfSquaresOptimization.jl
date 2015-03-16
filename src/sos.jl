@@ -8,6 +8,7 @@ type SoS
     slackvars :: Int  # counter
     vars :: Set{Symbol}  # all variables, including slack variables
     constraints :: Array{SoSPoly}  # polynomials that are constrained to 0
+
     objective :: SoSPoly
     maximize :: Bool
 end
@@ -54,7 +55,7 @@ function parsepoly{T<:Number}(sos :: Maybe{SoS}, ex :: T)
     return [(Symbol=>Int64)[] => convert(Float64, ex)] :: SoSPoly
 end
 function parsepoly(sos :: Maybe{SoS}, ex :: Expr)
-    if(ex.head == :call)
+    if ex.head == :call
         if(ex.args[1] == :(+))
             ret = parsepoly(sos,ex.args[2])
             for i in 3:length(ex.args)
@@ -82,6 +83,11 @@ function parsepoly(sos :: Maybe{SoS}, ex :: Expr)
             operand = parsepoly(sos, ex.args[2])
             return prod([operand for i in 1:ex.args[3]])
         end
+    elseif ex.head == :block # this happens on the RHS of single-equals
+        if length(ex.args) > 2
+            throw(ArgumentError(@sprintf("Multi-line block in expression: %s", ex)))
+        end
+        return parsepoly(sos, ex.args[2]) # assume it's a 1-line block
     end
     throw(ArgumentError(@sprintf("Expression not understood as polynomial: %s", ex)))
 end
@@ -90,7 +96,7 @@ end
 #  Add any constraint (given in Expr form) to the SoS program, by
 #    massaging it into a polynomial equaling zero.
 function addconstraint(sos :: SoS, ex :: Expr)
-    if(ex.head == :comparison)
+    if ex.head == :comparison
         if(ex.args[2] == :(>=) || ex.args[2] == :(≥))
             polyex = :( $(ex.args[1]) - $(ex.args[3]) - $(slackvar(sos))^2 )
         elseif(ex.args[2] == :(==))
@@ -101,7 +107,7 @@ function addconstraint(sos :: SoS, ex :: Expr)
             throw(ArgumentError(
                 "Comparison operator must be >=, ≥, ==, =, <=, or ≤"))
         end
-    elseif(ex.head == :(=)) # isn't Julia comparison, but we should support
+    elseif ex.head == :(=) # isn't Julia comparison, but we should support
         polyex = :( $(ex.args[1]) - $(ex.args[2]) )
     else
         throw(ArgumentError("Constraint must be an equation or inequality"))
