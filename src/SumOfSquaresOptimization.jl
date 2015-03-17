@@ -2,7 +2,7 @@ module SumOfSquaresOptimization
 
 using SemidefiniteProgramming
 
-export SoS, constraint, @constraint, @partobjective, @objective
+export SoS, constraint, partconstraint, objective, partobjective, @constraint, @partconstraint, @objective, @partobjective
 export sossolve
 export SoSSolution, moment, @moment, dump, sosobj
 

@@ -8,7 +8,7 @@ type SoS
     slackvars :: Int  # counter
     vars :: Set{Symbol}  # all variables, including slack variables
     constraints :: Array{SoSPoly}  # polynomials that are constrained to 0
-
+    namedconstraints :: Dict{Any,SoSPoly}
     objective :: SoSPoly
     maximize :: Bool
 end
@@ -18,7 +18,7 @@ SoS(; maximize=true, minimize=false) = begin
     if(maximize == false || minimize == true)
         mx = false
     end
-    SoS(0, Set{Symbol}(), [], SoSPoly(), mx)
+    SoS(0, Set{Symbol}(), [], Dict{Any,SoSPoly}(), SoSPoly(), mx)
 end
 
 
@@ -93,9 +93,8 @@ function parsepoly(sos :: Maybe{SoS}, ex :: Expr)
 end
 
 
-#  Add any constraint (given in Expr form) to the SoS program, by
-#    massaging it into a polynomial equaling zero.
-function addconstraint(sos :: SoS, ex :: Expr)
+#  Massage any constraint (given in Expr form) into a polynomial equaling zero.
+function relationToPolynomial(sos :: SoS, ex :: Expr)
     if ex.head == :comparison
         if(ex.args[2] == :(>=) || ex.args[2] == :(≥))
             polyex = :( $(ex.args[1]) - $(ex.args[3]) - $(slackvar(sos))^2 )
@@ -112,32 +111,41 @@ function addconstraint(sos :: SoS, ex :: Expr)
     else
         throw(ArgumentError("Constraint must be an equation or inequality"))
     end
-    #@printf("Original expression: %s\n", ex)
-    #@printf("Zeroing polynomial expression: %s\n", polyex)
-    poly = parsepoly(sos, polyex)
-    #@printf("Adding constraint: %s should be zero\n", poly)
-    push!(sos.constraints, poly)
+
+    parsepoly(sos, polyex)
 end
 
-#  Add a polynomial (given in Expr form) to the objective.
-function addobjective(sos :: SoS, ex)
-    poly = parsepoly(sos, ex)
-    #@printf("Adding to objective: %s\n", poly)
-    sos.objective += poly
-end
-#  Set a polynomial (given in Expr form) as the objective, overwriting what
-#    was there before.
-function setobjective(sos :: SoS, ex)
-    poly = parsepoly(sos, ex)
-    sos.objective = poly
-end
 
 
 function constraint(sos,str)
-    addconstraint( sos, parse(str) )
+    poly = relationToPolynomial(sos, parse(str))
+    push!(sos.constraints, poly)
 end
 
-#  The following three macros are the main user-facing ways to prepare
+function partconstraint(sos,key,str)
+    poly = parsepoly(sos, parse(str))
+#    poly = relationToPolynomial(sos, parse(str))
+
+    if haskey(sos.namedconstraints, key)
+        prev = sos.namedconstraints[key]
+        addpoly!(prev,poly)
+    else
+        push!(sos.constraints, poly)
+        sos.namedconstraints[key] = poly
+    end
+end
+
+function partobjective(sos,str)
+    poly = parsepoly(sos, parse(str))
+    sos.objective += poly
+end
+
+function objective(sos,str)
+    poly = parsepoly(sos, parse(str))
+    sos.objective = poly
+end
+
+#  The following four macros are the main user-facing ways to prepare
 #    a SoS program.
 #    This section is `esc` hell and was a pain to figure out.
 
@@ -147,7 +155,25 @@ macro constraint(sos,args...)
     escargs = [esc(x) for x in args[2:end]]
     quote
         str = @sprintf($(args[1]),$(escargs...))
-        addconstraint( $(esc(sos)), parse(str) )
+        constraint( $(esc(sos)), str )
+    end
+end
+
+macro partconstraint(sos,key,args...)
+    escargs = [esc(x) for x in args[2:end]]
+    quote
+        str = @sprintf($(args[1]),$(escargs...))
+        partconstraint( $(esc(sos)), $(esc(key)), str )
+    end
+end
+
+
+#  Set a polynomial (given in printf form) as the objective.
+macro objective(sos,args...)
+    escargs = [esc(x) for x in args[2:end]]
+    quote
+        str = @sprintf($(args[1]),$(escargs...))
+        objective( $(esc(sos)), str )
     end
 end
 
@@ -156,16 +182,7 @@ macro partobjective(sos,args...)
     escargs = [esc(x) for x in args[2:end]]
     quote
         str = @sprintf($(args[1]),$(escargs...))
-        addobjective( $(esc(sos)), parse(str) )
-    end
-end
-
-#  Set a polynomial (given in printf form) as the objective.
-macro objective(sos,args...)
-    escargs = [esc(x) for x in args[2:end]]
-    quote
-        str = @sprintf($(args[1]),$(escargs...))
-        setobjective( $(esc(sos)), parse(str) )
+        partobjective( $(esc(sos)), str )
     end
 end
 

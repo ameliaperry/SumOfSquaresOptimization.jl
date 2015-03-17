@@ -39,6 +39,14 @@ function +(a::SoSPoly, b::SoSPoly)
     return map
 end
 
+#  Addition in-place of polynomials
+function addpoly!(a::SoSPoly, b::SoSPoly)
+    for (k,v) in b
+        a[k] = get(a,k,0.0) + v
+    end
+end
+
+
 #  Multiplication of polynomials
 #    just the naive method
 function *(a::SoSPoly, b::SoSPoly)
