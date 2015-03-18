@@ -45,7 +45,8 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
     setrhs!(sdp,constridx, 1.0)
     constridx += 1
 
-    # symmetry constraints
+    # symmetry (alpha) constraints
+    alphaidx = ((SoSMonom,SoSMonom,SoSMonom,SoSMonom)=>Int)[]
     for md in 0:d
         for monom in monoms(sos,md)
             dec = decomp(monom, div(d,2))
@@ -55,6 +56,7 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
                     continue
                 end
                 #@printf("symmetry: %s is %s\n", (a,b), (a1,b1))
+                alphaidx[(a,b,a1,b1)] = constridx
                 setcon!(sdp,constridx, 1, a, b, (a == b ? 1.0 : 0.5))
                 setcon!(sdp,constridx, 1,a1,b1, (a1 == b1 ? -1.0 : -0.5))
                 setrhs!(sdp,constridx,0.0)
@@ -63,7 +65,8 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
         end
     end
 
-    # given constraints
+    # given (beta) constraints
+    betaidx = ((SoSPoly,SoSMonom)=>Int)[]
     for poly in sos.constraints
 
         pd = deg(poly)
@@ -74,6 +77,7 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
         # promote to higher degree in all possible ways
         for promdeg in 0:(d-pd)
             for monom in monoms(sos,promdeg)
+                betaidx[(poly,monom)] = constridx
 
                 for (k,v) in poly
                     (k1,k2) = decomp1(k * monom, div(d,2))
@@ -93,7 +97,7 @@ function sossolve(sos :: SoS, d :: Int64; solver="csdp")
     # solve
     sol = solve(sdp, solverinst)
     @printf("done.\n")
-    SoSSolution(d, sol)
+    SoSSolution(sos, d, alphaidx, betaidx, sol)
 end
 
 

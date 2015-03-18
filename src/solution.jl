@@ -1,7 +1,10 @@
 
 
 type SoSSolution
+    prog :: SoS
     degree :: Int64
+    alphaidx :: Dict{(SoSMonom,SoSMonom,SoSMonom,SoSMonom),Int64}
+    betaidx :: Dict{(SoSPoly,SoSMonom),Int64}
     sdp :: SparseSDPSolution
 end
 
@@ -17,10 +20,13 @@ function moment(sol :: SoSSolution, monom :: SoSMonom)
 
     (m1,m2) = decomp1(monom, div(sol.degree,2))
     
-    # XXX what if the input variables are bad, and we don't have moments for them?
-    # should test that primalmatrix actually has these entries, and throw a 
-    # meaningful exception if not
-    primalmatrix(sol.sdp)[1][m1,m2]
+    mat = primalmatrix(sol.sdp)[1]
+    # TODO we should complain if the variables in m1 or m2 aren't variables of our SoS program.
+    # Currently unrecognized moments return 0 (this is the implementation in SemidefiniteProgramming.jl)
+#    if haskey(entries(mat), (m1,m2))
+#        throw(ArgumentError("Solution does not have moments for these variables"))
+#    end
+    mat[m1,m2]
 end
 
 function moment(sol :: SoSSolution, poly :: SoSPoly)
