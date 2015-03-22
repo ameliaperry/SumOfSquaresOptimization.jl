@@ -20,7 +20,7 @@ function symmetrize!(sol :: SoSSolution, genperms :: Array{Dict{Symbol,Symbol}})
     #    symmetric way.)
     #    For now, we leave the alpha vectors in an inconsistent state! XXX TODO, better hope nobody cares.
     #    What we should probably do is at least make them consistent again, even if they can't be made
-    #    symmetric.
+    #    symmetric. Does this require solving a linear system...? Is there a clean way?
     #  symmetrize the dual vector -- have to act on constraint polynomials and their promoting monomials.
     
     
@@ -80,6 +80,13 @@ function symmetrize!(sol :: SoSSolution, genperms :: Array{Dict{Symbol,Symbol}})
     
 
     # symmetrize the "alpha" entries of the dual vector
+    #
+    # XXX this doesn't work as written below: when we act on
+    # (a,b,c,d) by the diagonal action, we don't necessarily get
+    # another quadruple for which an alpha variable exists. If we
+    # included alpha variables for every quadruple, the SDP would
+    # become huge. We can't choose a minimal subset in a symmetric
+    # way.
     #=
     seen = Set{(SoSMonom,SoSMonom,SoSMonom,SoSMonom)}()
     for ((ba,bb,bc,bd),bi) in sol.alphaidx

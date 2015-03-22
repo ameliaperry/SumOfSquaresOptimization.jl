@@ -145,6 +145,28 @@ function objective(sos,str)
     sos.objective = poly
 end
 
+
+function perturb_objective(sos,tol,deg)
+    for md in 1:deg
+        for mon in monoms(sos,md)
+            poly = [ mon => tol * randn() ] :: SoSPoly
+            sos.objective += poly
+        end
+    end
+end
+
+function perturb_objective_sparse(sos,tol,s,deg)
+    mon = [ monoms(sos,i) for i in 0:deg ]
+    mon = vcat(mon...)
+    for i in 1:s
+        idx = rand(1:length(mon))
+        m = mon[idx]
+        poly = [ m => tol * randn() ] :: SoSPoly
+        sos.objective += poly
+    end
+end
+
+
 #  The following four macros are the main user-facing ways to prepare
 #    a SoS program.
 #    This section is `esc` hell and was a pain to figure out.

@@ -2,9 +2,19 @@ module SumOfSquaresOptimization
 
 using SemidefiniteProgramming
 
-export SoS, constraint, partconstraint, objective, partobjective, @constraint, @partconstraint, @objective, @partobjective
+# sos.jl
+export SoS
+export constraint, partconstraint, objective, partobjective
+export @constraint, @partconstraint, @objective, @partobjective
+export perturb_objective, perturb_objective_sparse
+
+# solve.jl
 export sossolve
+
+# solution.jl
 export SoSSolution, moment, @moment, dump, sosobj
+
+# symmetrize.jl
 export symmetrize!, symmetrize_cyclic!, symmetrize_dihedral!, symmetrize_full!
 
 include("monoms.jl")
