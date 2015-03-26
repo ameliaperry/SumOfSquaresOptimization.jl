@@ -65,12 +65,8 @@ function *(a::SoSPoly, b::SoSPoly)
 end
 
 #  Degree of monomial / polynomial
-function deg(m :: SoSMonom)
-    sum(values(m))
-end
-function deg(p :: SoSPoly)
-    maximum([deg(k) for (k,v) in p])
-end
+deg(m :: SoSMonom) = sum(values(m))
+deg(p :: SoSPoly) = maximum([deg(k) for (k,v) in p])
 
 
 #  Enumerate all monomials of degree d.
@@ -104,7 +100,6 @@ end
 
 #  Find all decompositions of mon into two monomials (m1,m2)
 #    each of degree at most degmax.
-#    TODO: implement as an iterator.
 function decomp(mon :: SoSMonom, degmax :: Int64)
     # maybe there's room for improvement here ...
     list = (SoSMonom,SoSMonom)[]
@@ -133,38 +128,5 @@ function decomp(mon :: SoSMonom, degmax :: Int64)
     end
 
     list
-end
-
-#  Find a single decomposition of mon into two monomials (m1,m2)
-#    each of degree at most degmax.
-#    TODO: make this code less redundant. Maybe once decomp() is
-#    an iterator, we can just pull off the first one.
-function decomp1(mon :: SoSMonom, degmax :: Int64)
-    # maybe there's room for improvement here ...
-    varr = [k for (k,v) in mon]
-    
-    # for each candidate m1, see if its complement m2 is sensible
-    mondeg = deg(mon)
-    dmin = max(0,mondeg-degmax)
-    dmax = min(mondeg,degmax)
-    for deg in dmin:dmax
-        for m1 in monoms(varr,deg)
-
-            # construct the complement
-            m2 = [k=>(v-get(m1,k,0)) for (k,v) in mon]
-
-            # test for being sensible (ie non-negative exponents), and remove any zero entries
-            if(length(m2) > 0 && minimum(values(m2)) < 0)
-                continue
-            end
-
-            # remove any zero entries
-            filter!((k,v)->(v!=0), m2)
-            
-            return (m1,m2)
-        end
-    end
-
-    throw(Error("No monomial decompositions found! Some degree must be off. Please report this bug."))
 end
 
