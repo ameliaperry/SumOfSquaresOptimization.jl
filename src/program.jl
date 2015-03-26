@@ -13,39 +13,23 @@ type Program
     maximize :: Bool
 end
 Program(; maximize=true, minimize=false) = begin
-    # default to maximize; switch to minimize if there's any sign to do so
-    mx = true
-    if(maximize == false || minimize == true)
-        mx = false
-    end
+    mx = (maximize && !minimize) # default to maximize; switch to minimize if there's any sign to do so
     Program(0, Set{Symbol}(), [], Dict{Any,SoSPoly}(), SoSPoly(), mx)
 end
 
-
 #  Generate a new slack variable (a Symbol)
-function slackvar(prog :: Program)
-    prog.slackvars += 1
-    # there's a better symbol() in julia 0.4, but let's target 0.3
-    return symbol(@sprintf("slack%d",prog.slackvars))
-end
+slackvar(prog :: Program) = symbol( @sprintf("slack%d", prog.slackvars += 1) )
 
-#  Convenience: enumerate monomials in the variables that a Program
-#    knows about.
-function monoms(prog :: Program, d :: Int64)
-    varr = [v for v in prog.vars]
-    monoms(varr,d)
-end
-
+# convenience
+monoms(prog :: Program, d :: Int64) = monoms([prog.vars...], d)
 
 typealias Maybe{T} Union(T,Nothing)
-
-
 
 
 #  Parse a polynomial (in Expr form) into a SoSPoly, by traversing
 #    a Julia syntax tree.
 function parsepoly(prog :: Maybe{Program}, ex::Symbol)
-    if(prog != nothing)
+    if prog != nothing
         push!(prog.vars, ex)
     end
 
@@ -119,35 +103,10 @@ end
 
 
 
-function constraint(prog,str)
-    poly = relationToPolynomial(prog, parse(str))
-    push!(prog.constraints, poly)
-end
 
-function partconstraint(prog,key,str)
-    poly = parsepoly(prog, parse(str))
-#    poly = relationToPolynomial(prog, parse(str))
-
-    if haskey(prog.namedconstraints, key)
-        prev = prog.namedconstraints[key]
-        addpoly!(prev,poly)
-    else
-        push!(prog.constraints, poly)
-        prog.namedconstraints[key] = poly
-    end
-end
-
-function partobjective(prog,str)
-    poly = parsepoly(prog, parse(str))
-    prog.objective += poly
-end
-
-function objective(prog,str)
-    poly = parsepoly(prog, parse(str))
-    prog.objective = poly
-end
-
-
+#  Perturb the objective by Gaussian noise with standard deviation `tol`.
+#  Each moment up to degree `deg`, in the variables known to `prog`, receives
+#  noise.
 function perturb_objective(prog,tol,deg)
     for md in 1:deg
         for mon in monoms(prog,md)
@@ -157,6 +116,9 @@ function perturb_objective(prog,tol,deg)
     end
 end
 
+#  Perturb the objective by Gaussian noise with standard deviation `tol`.
+#  A random choice of `s` terms (with replacement), from the moments up to
+#  degree `deg`, in the variables known to `prog`, receives noise.
 function perturb_objective_sparse(prog,tol,s,deg)
     mon = [ monoms(prog,i) for i in 0:deg ]
     mon = vcat(mon...)
@@ -169,12 +131,40 @@ function perturb_objective_sparse(prog,tol,s,deg)
 end
 
 
-#  The following four macros are the main user-facing ways to prepare
-#    a program.
-#    This section is `esc` hell and was a pain to figure out.
+#  Add a constraint to the program.
+function constraint(prog,str)
+    poly = relationToPolynomial(prog, parse(str))
+    push!(prog.constraints, poly)
+end
+
+#  Add a polynomial to a constraint indexed by `key`.
+function partconstraint(prog,key,str)
+    poly = parsepoly(prog, parse(str))
+
+    if haskey(prog.namedconstraints, key)
+        prev = prog.namedconstraints[key]
+        addpoly!(prev,poly)
+    else
+        push!(prog.constraints, poly)
+        prog.namedconstraints[key] = poly
+    end
+end
+
+#  Set a polynomial as the objective.
+objective(prog,str) = prog.objective = parsepoly(prog, parse(str))
+
+#  Add a polynomial to the objective.
+partobjective(prog,str) = prog.objective += parsepoly(prog, parse(str))
+
+
+#  `printf`-style macros for constraints and objectives.
+#  This section is `esc` hell and was a pain to figure out.
+#  Since we're calling a macro from a macro, we have three different
+#  scopes in play at once, and we need to make sure everything gets evaluated
+#  in the right scope.
+
 
 #  Add a constraint (given in printf form) to the program.
-#     This will be the main user-facing way to add constraints.
 macro constraint(prog,args...)
     escargs = [esc(x) for x in args[2:end]]
     quote
@@ -183,6 +173,7 @@ macro constraint(prog,args...)
     end
 end
 
+#  Add a polynomial (given in printf form) to a constraint indexed by `key`.
 macro partconstraint(prog,key,args...)
     escargs = [esc(x) for x in args[2:end]]
     quote
