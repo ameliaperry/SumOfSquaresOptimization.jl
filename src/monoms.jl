@@ -9,6 +9,9 @@ typealias SoSMonom Dict{Symbol,Int64}
 #  An SoSPoly maps each monomial to its coefficient.
 typealias SoSPoly Dict{SoSMonom,Float64}
 
+one = Dict{Symbol,Int64}() :: SoSMonom
+
+
 
 #  Multiplication of polynomials.
 #    there should be a faster sum here that manages iterators, a la mergesort
@@ -76,17 +79,18 @@ end
 #    via (v+d-1 choose d).
 function monoms(varr :: Array{Symbol}, d :: Int64)
     v = length(varr)
-    [combToMonom(varr,co) for co in combinations([1:(v+d-1)],d)]
+#    [combToMonom(varr,co) for co in combinations([1:(v+d-1)],d)]
+    [combToMonom(varr,co) for co in combinations(1:(v+d-1),d)]
 end
 function monoms(d :: Int64) # edge case
     if (d == 0)
-        return [(Symbol=>Int64)[]]
+        return [Dict{Symbol,Int64}()]
     else
         return []
     end
 end
 function combToMonom(varr :: Array{Symbol}, co :: Array{Int64})
-    m = (Symbol=>Int64)[] :: SoSMonom
+    m = Dict{Symbol,Int64}() :: SoSMonom
     shift = 0
     for i in co
         k = varr[i+shift]
