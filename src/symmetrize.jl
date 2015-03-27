@@ -57,20 +57,66 @@ end
 
 
 symmetrize!(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}) = append!(prog.symmetries, genperms)
+symmetrize!(prog :: Program, genperm :: Dict{Symbol,Symbol}) = push!(prog.symmetries, genperm)
 
+# symmetry according to dihedral group (rotation and reflection)
 function symmetrize_dihedral!(prog :: Program, cycle :: Array{Symbol})
     n = length(cycle)
-    rotate = (Symbol=>Symbol)[ cycle[i] => cycle[(i % n) + 1] for i in 1:n ]
-    flip = (Symbol=>Symbol)[ cycle[i] => cycle[n + 1 - i] for i in 1:n ]
-    symmetrize!(prog, [rotate,flip])
+    symmetrize!(prog, [ cycle[i] => cycle[(i % n) + 1] for i in 1:n ]) # rotate
+    symmetrize!(prog, [ cycle[i] => cycle[n + 1 - i] for i in 1:n ]) # reflect
 end
 
+# symmetry according to cyclic group (rotation only)
 function symmetrize_cyclic!(prog :: Program, cycle :: Array{Symbol})
     n = length(cycle)
-    rotate = (Symbol=>Symbol)[ cycle[i] => cycle[(i % n) + 1] for i in 1:n ]
-    symmetrize!(prog, [rotate])
+    symmetrize!(prog, [ cycle[i] => cycle[(i % n) + 1] for i in 1:n ]) # rotate
 end
 
+# symmetry according to hyperoctahedral group
+# warning: bit hacks
+function symmetrize_hypercube!(prog :: Program, cube :: Array{Symbol})
+    n = length(cube)
+    if (n & (n - 1)) != 0 # n is not a power of 2
+        throw(ArgumentException("argument list in symmetrize_hypercube must be a power of 2"))
+    end
+
+    # reflection along first coordinate
+    if n >= 2
+        refl = Dict{Symbol,Symbol}()
+        for i in 0:(n-1)
+            j = i $ 1
+            refl[cube[i+1]] = cube[j+1]
+        end
+        symmetrize!(prog, refl)
+    end
+
+    # transposition of first two coordinates
+    if n >= 4
+        trans = Dict{Symbol,Symbol}()
+        for i in 0:(n-1)
+            bot = i & 3
+            j = (bot == 1 || bot == 2) ? i$3 : i
+            trans[cube[i+1]] = cube[j+1]
+        end
+        symmetrize!(prog, trans)
+    end
+
+    # cyclic permutation of all coordinates
+    if n >= 8
+        cycle = Dict{Symbol,Symbol}()
+        for i in 0:(n-1)
+            j = i<<1
+            if ( (j & n) != 0)
+                j $= n
+                j $= 1
+            end
+            cycle[cube[i+1]] = cube[j+1]
+        end
+        symmetrize!(prog, cycle)
+    end
+end
+
+# symmetry according to full symmetric group
 function symmetrize_full!(prog :: Program, syms :: Array{Symbol})
     n = length(syms)
     if(n < 2) return end

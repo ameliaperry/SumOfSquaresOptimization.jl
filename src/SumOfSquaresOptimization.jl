@@ -17,7 +17,8 @@ export dump, obj, primalobj, dualobj
 export moment, @moment
 
 # symmetrize.jl
-export symmetrize!, symmetrize_cyclic!, symmetrize_dihedral!, symmetrize_full!
+export symmetrize!
+export symmetrize_cyclic!, symmetrize_dihedral!, symmetrize_hypercube!, symmetrize_full!
 
 include("monoms.jl")
 include("program.jl")
