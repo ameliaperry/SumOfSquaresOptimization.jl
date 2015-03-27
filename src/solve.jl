@@ -107,18 +107,12 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Computing initial value: ")
     @time initial = vec(C \ Cconst)
 
-    @printf("Size of C is %s\n", size(C))
-    @printf("Orbits: %s\n", revomap)
-
     # dual objective = primal constant-term
     @printf("Writing initial value: ")
     @time begin
         setobj!(sdp, 1, one, one, -1.0)
         for a in mon0d2
             for b in mon1d2
-                @printf("a*b is %s\n", a*b)
-                @printf("omap[a*b] is %d\n", omap[a*b])
-                @printf("length(initial) is %d\n", length(initial))
                 setobj!(sdp, 1, a, b, initial[omap[a*b]-1])
             end
         end
