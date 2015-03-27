@@ -44,16 +44,17 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
             # promote to higher degree in all possible ways
             for promdeg in 0:(d-pd)
-                row = Dict{Int64,Float64}()
                 for monom in monall[promdeg+1] # +1 because monall is an array indexed from 1
+
+                    row = Dict{Int64,Float64}()
                     for (k,v) in poly
                         row[omap[k*monom]] = v
                     end
-                end
+                    # only add this row if it's actually new
+                    if !any(o -> rowdist(row,o) < 1e-8, rows)
+                        push!(rows,row)
+                    end
 
-                # only add this row if it's actually new
-                if !any(o -> rowdist(row,o) < 1e-8, rows)
-                    push!(rows,row)
                 end
             end
         end
@@ -203,13 +204,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 end
 
 
-function rowdist(r1,r2)
-    ret = halfrowdist(r1,r2) + halfrowdist(r2,r1)
-    if(ret < 0.001)
-        @printf("distance between %s and %s is %f\n", r1, r2, ret)
-    end
-    ret
-end
+rowdist(r1,r2)= halfrowdist(r1,r2) + halfrowdist(r2,r1)
 function halfrowdist(r1 :: Dict{Int64,Float64}, r2 :: Dict{Int64,Float64})
     dist = 0.0
     for (k,v) in r1
