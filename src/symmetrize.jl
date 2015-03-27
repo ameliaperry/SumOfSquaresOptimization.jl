@@ -9,11 +9,14 @@ function act(poly :: SoSPoly, perm :: Dict{Symbol,Symbol})
     [ act(k,perm) => v for (k,v) in poly ] :: SoSPoly
 end
 
-# returns a Dict{SoSMonom,Symbol} mapping monomials to their orbits
-function monom_orbits(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}, deg :: Int64)
+# maps monomials to their orbits; returns maps in both directions
+# note: this is roughly order-preserving, at least to the extent that the first
+# monomial given will lie in orbit 1, which is used.
+function monom_orbits(monoms :: Array{SoSMonom}, genperms :: Array{Dict{Symbol,Symbol}})
+    ret1 = Dict{SoSMonom,Int64}()
+    ret2 = Set{SoSMonom}[]
 
-    monoms = vcat( [ SumOfSquaresOptimization.monoms(prog,i) for i in 0:deg ] ... )
-    ret = Dict{SoSMonom,Symbol}()
+    orbitidx = 0
     
     seen = Set{SoSMonom}()
     for b in monoms
@@ -21,6 +24,7 @@ function monom_orbits(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}, d
             continue
         end
         
+        orbitidx += 1
         orbit = Set{SoSMonom}()
         q = SoSMonom[]
         
@@ -31,6 +35,7 @@ function monom_orbits(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}, d
         # explore the orbit
         while !isempty(q)
             c = shift!(q)
+            ret1[c] = orbitidx # here's the actual orbit-mapping assignment
             
             # act every possible way on the current element
             for perm in genperms
@@ -43,22 +48,15 @@ function monom_orbits(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}, d
             end
         end
 
-        sym = gensym()
-        for i in orbit
-            ret[i] = sym
-        end
-        
         union!(seen,orbit)
+        push!(ret2, orbit)
     end
     
-    ret
+    ret1, ret2
 end
 
 
-function symmetrize!(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}})
-    # TODO
-end
-
+symmetrize!(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}) = append!(prog.symmetries, genperms)
 
 function symmetrize_dihedral!(prog :: Program, cycle :: Array{Symbol})
     n = length(cycle)
@@ -74,11 +72,8 @@ function symmetrize_cyclic!(prog :: Program, cycle :: Array{Symbol})
 end
 
 function symmetrize_full!(prog :: Program, syms :: Array{Symbol})
-    if(length(syms) < 2)
-        return
-    end
-
-    n = length(cycle)
+    n = length(syms)
+    if(n < 2) return end
     rotate = (Symbol=>Symbol)[ syms[i] => syms[(i % n) + 1] for i in 1:n ]
     transpose = (Symbol=>Symbol){ syms[1] => syms[2], syms[2] => syms[1] }
     symmetrize!(prog, [rotate,transpose])

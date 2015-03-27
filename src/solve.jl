@@ -21,10 +21,17 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Enumerating monomials and their decompositions -- ")
     @time begin
         # choose an order for indexing non-1 monomials
-        mond = vcat( [ monoms(prog,i) for i in 0:d ] ... )
+        monall = [ monoms(prog,i) for i in 0:d ]
+        mond = vcat(monall...)
         mondrev = [ mond[i]=>i for i in 1:length(mond) ]
-        dec = [ decomp(m, div(d,2)) for m in mond ]
+        mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 1 to d/2
+        mon1d2 = mon0d2[2:end]
+        dec = [ decomp(m, div(d,2)) for m in mond ] # XXX this is only used in one place now. can we push it out?
     end
+
+
+    @printf("Symmetrizing monomials -- ")
+    @time omap, revomap = monom_orbits(mond, prog.symmetries)
 
 
     @printf("Writing constraint-by-moment matrix -- ")
@@ -42,10 +49,10 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
             # promote to higher degree in all possible ways
             for promdeg in 0:(d-pd)
-                for monom in monoms(prog,promdeg) # XXX should we avoid re-generating these for each constraint?
+                for monom in monall[promdeg+1] # +1 because monall is an array indexed from 1
                     for (k,v) in poly
                         push!(CI, constridx)
-                        push!(CJ, mondrev[k * monom])
+                        push!(CJ, omap[k * monom])
                         push!(CV, v)
                     end
                     constridx += 1
@@ -59,9 +66,9 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Manipulating data structures -- ")
     @time begin
         # write our objective in moments
-        O = zeros(length(mond))
+        O = zeros(length(revomap))
         for (k,v) in prog.objective
-            O[mondrev[k]] = v
+            O[omap[k]] += v
         end
 
         # separate the constant column from the rest
@@ -70,8 +77,10 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         Oconst = O[1]
         O = O[2:end]
         mond = mond[2:end] # excluding constant term
-        mondrev = [ mond[i]=>i for i in 1:length(mond) ]
+        mondrev = [ mond[i]=>i for i in 1:length(mond) ] # XXX unused
         dec = dec[2:end]
+        # XXX omap
+        revomap = revomap[2:end]
     end
 
 
@@ -94,16 +103,16 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Writing initial value: ")
     @time begin
         setobj!(sdp, 1, one, one, -1.0)
-        for j in 1:length(initial)
-            for (a,b) in dec[j]
-                setobj!(sdp, 1, a, b, initial[j])
+        for a in mon0d2
+            for b in mon1d2
+                setobj!(sdp, 1, a, b, initial[omap[a*b]-1])
             end
         end
     end
 
 
     # compute the nullspace
-    @printf("Computing nullspace: ")
+    @printf("Computing ideal basis: ")
     @time B = null(C)
 #    println(rref(C))
 
@@ -113,10 +122,9 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @time for i in 1:size(B,2)
         
         # rewrite B[:,i] as a matrix in d/2 x d/2 moment decompositions
-        for j in 1:size(B,1)
-
-            for (a,b) in dec[j]
-                setcon!(sdp, i, 1, a, b, B[j,i])
+        for a in mon0d2
+            for b in mon1d2
+                setcon!(sdp, i, 1, a, b, B[omap[a*b]-1, i])
             end
         end
 
@@ -134,7 +142,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     nvars = count_monoms(prog, div(d,2))
     @printf("Solving SDP with %d^2 entries and %d constraints... ", count_monoms(prog, div(d,2)), size(B,2))
     
-    CI = CJ = CV = C = Cconst = O = Oconst = B = initial = 0 # free some memory
+    CI = CJ = CV = C = Cconst = O = Oconst = B = initial = monall = mondrev = omap = revomap = 0 # free some memory
     @time sol = solve(sdp, solverinst)
 
 
@@ -146,33 +154,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         SoSSolution(prog, d, sol.obj + adjust_obj, sol.dualobj + adjust_obj, moments, sol.primalmatrix)
     end
 end
-    
-
-
-    #=
-    @printf("computing rref: ")
-    @time R = rref(C)
-    Rnz = 0
-    Rrows = 0
-    for i in 1:size(R,2)
-        v = R[:,i]
-
-        ct = 0
-        for val in v
-            if abs(val) > 1e-7
-                ct += 1
-            end
-        end
-
-        if ct == 1
-            continue
-        end
-
-        Rnz += ct + 1
-        Rrows += 1
-    end
-    @printf("rref-nullspace has %d vectors, with %d nonzero entries (density %f)\n", Rrows, Rnz, Rnz / (Rrows * size(R,2)))
-    =#
 
 
 function count_monoms(prog :: Program, d :: Int64)

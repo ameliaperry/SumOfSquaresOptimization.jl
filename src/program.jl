@@ -1,9 +1,9 @@
-#############################
-###### Sums of Squares ######
-#############################
+#################################
+###### Polynomial programs ######
+#################################
 
 #  A system of polynomial equations.
-#    We convert inequalities into equations with slack variables (squared).
+#  We convert inequalities into equations with slack variables (squared).
 type Program
     slackvars :: Int  # counter
     vars :: Set{Symbol}  # all variables, including slack variables
@@ -11,10 +11,11 @@ type Program
     namedconstraints :: Dict{Any,SoSPoly}
     objective :: SoSPoly
     maximize :: Bool
+    symmetries :: Array{Dict{Symbol,Symbol}}
 end
 Program(; maximize=true, minimize=false) = begin
     mx = (maximize && !minimize) # default to maximize; switch to minimize if there's any sign to do so
-    Program(0, Set{Symbol}(), [], Dict{Any,SoSPoly}(), SoSPoly(), mx)
+    Program(0, Set{Symbol}(), [], Dict{Any,SoSPoly}(), SoSPoly(), mx, [])
 end
 
 #  Generate a new slack variable (a Symbol)
@@ -28,17 +29,14 @@ typealias Maybe{T} Union(T,Nothing)
 
 #  Parse a polynomial (in Expr form) into a SoSPoly, by traversing
 #    a Julia syntax tree.
+
+parsepoly{T<:Number}(prog :: Maybe{Program}, ex :: T) = [ one => convert(Float64, ex) ] :: SoSPoly
+
 function parsepoly(prog :: Maybe{Program}, ex::Symbol)
-    if prog != nothing
-        push!(prog.vars, ex)
-    end
-
-    return [[ex => 1] => 1.0] :: SoSPoly
+    prog == nothing || push!(prog.vars, ex)
+    [[ex => 1] => 1.0] :: SoSPoly
 end
 
-function parsepoly{T<:Number}(prog :: Maybe{Program}, ex :: T)
-    return [ one => convert(Float64, ex) ] :: SoSPoly
-end
 
 function parsepoly(prog :: Maybe{Program}, ex :: Expr)
     if ex.head == :call
