@@ -41,9 +41,10 @@ The following will solve a polynomial system and access a solution:
 * `primalobj(sol)` and `dualobj(sol)` return the objective values (which are hopefully equal).
 
 The following functions provide symmetry hints, enabling faster solution and ensuring symmetric moments:
-* `symmetrize!(prog, perms)`, where `perms` is an array of `Dict{Symbol,Symbol}` objects encoding *generating* permutations.
+* `symmetrize!(prog, perms)`, where `perms` is a `Dict{Symbol,Symbol}` encoding a permutation, or a collection of these. Only generators need to be specified, not the full permutation group.
 * `symmetrize_dihedral!(prog, cycle)`, where `cycle` is an array of `Symbol`s. This imposes symmetry under the action of the dihedral group.
 * `symmetrize_cyclic!(prog, cycle)`, much as the previous but for the cyclic group -- so no reflection symmetry of the given cycle is imposed.
+* `symmetrize_hypercube!(prog, cube)`, imposing hypercube symmetry on 2^n variables (the hyperoctahedral group).
 * `symmetrize_full!(prog, symbols)`, for full permutation symmetry of the given `Array{Symbol}`.
 
 
