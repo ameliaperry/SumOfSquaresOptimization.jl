@@ -59,7 +59,15 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
                 end
             end
         end
-        C = sparse(CI,CJ,CV)
+
+        # XXX we have to specify width `length(revomap)` in case higher moments /
+        # orbits don't show # up in the promoted constraints. In principle,
+        # though, it'd make the linear algebra faster to exclude these columns,
+        # and manually re-include them after the linear algebra.
+        # XXX we're not getting any mileage out of the sparsity here. Fix this.
+        # We should be able to at least find `initial` using sparse QR, even if
+        # we can't find the nullspace in a sparse-friendly way.
+        C = sparse(CI,CJ,CV, maximum(CI), length(revomap))
     end
 
 
@@ -99,12 +107,18 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Computing initial value: ")
     @time initial = vec(C \ Cconst)
 
+    @printf("Size of C is %s\n", size(C))
+    @printf("Orbits: %s\n", revomap)
+
     # dual objective = primal constant-term
     @printf("Writing initial value: ")
     @time begin
         setobj!(sdp, 1, one, one, -1.0)
         for a in mon0d2
             for b in mon1d2
+                @printf("a*b is %s\n", a*b)
+                @printf("omap[a*b] is %d\n", omap[a*b])
+                @printf("length(initial) is %d\n", length(initial))
                 setobj!(sdp, 1, a, b, initial[omap[a*b]-1])
             end
         end
@@ -127,7 +141,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
                 setcon!(sdp, i, 1, a, b, B[omap[a*b]-1, i])
             end
         end
-
 
         rhs = dot(O, B[:,i])
         setrhs!(sdp, i, rhs)
