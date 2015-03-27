@@ -11,7 +11,7 @@ end
 
 # maps monomials to their orbits; returns maps in both directions
 # note: this is roughly order-preserving, at least to the extent that the first
-# monomial given will lie in orbit 1, which is used.
+# monomial given will lie in orbit 1, which is relied on in sossolve().
 function monom_orbits(monoms :: Array{SoSMonom}, genperms :: Array{Dict{Symbol,Symbol}})
     ret1 = Dict{SoSMonom,Int64}()
     ret2 = Set{SoSMonom}[]

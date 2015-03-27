@@ -18,7 +18,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     end
 
 
-    @printf("Enumerating monomials and their decompositions -- ")
+    @printf("Enumerating monomials -- ")
     @time begin
         # choose an order for indexing non-1 monomials
         monall = [ monoms(prog,i) for i in 0:d ]
@@ -26,10 +26,9 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         mondrev = [ mond[i]=>i for i in 1:length(mond) ]
         mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 1 to d/2
         mon1d2 = mon0d2[2:end]
-        dec = [ decomp(m, div(d,2)) for m in mond ] # XXX this is only used in one place now. can we push it out?
     end
 
-
+    
     @printf("Symmetrizing monomials -- ")
     @time omap, revomap = monom_orbits(mond, prog.symmetries)
 
@@ -37,10 +36,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Writing constraint-by-moment matrix -- ")
     @time begin
         # write the (sparse) constraint-by-moment occurence matrix C
-        CI = Int64[]
-        CJ = Int64[]
-        CV = Float64[]
-        constridx=1
+        rows = Dict{Int64,Float64}[]
         for poly in prog.constraints
             pd = deg(poly)
             if(pd > d)
@@ -49,17 +45,21 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
             # promote to higher degree in all possible ways
             for promdeg in 0:(d-pd)
+                row = Dict{Int64,Float64}()
                 for monom in monall[promdeg+1] # +1 because monall is an array indexed from 1
                     for (k,v) in poly
-                        push!(CI, constridx)
-                        push!(CJ, omap[k * monom])
-                        push!(CV, v)
+                        row[omap[k*monom]] = v
                     end
-                    constridx += 1
+                end
+
+                # only add this row if it's actually new
+                if !any(o -> rowdist(row,o) < 1e-8, rows)
+                    push!(rows,row)
                 end
             end
         end
 
+        # transcribe the rows to a matrix
         # XXX we have to specify width `length(revomap)` in case higher moments /
         # orbits don't show # up in the promoted constraints. In principle,
         # though, it'd make the linear algebra faster to exclude these columns,
@@ -67,8 +67,14 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         # XXX we're not getting any mileage out of the sparsity here. Fix this.
         # We should be able to at least find `initial` using sparse QR, even if
         # we can't find the nullspace in a sparse-friendly way.
-        C = sparse(CI,CJ,CV, maximum(CI), length(revomap))
+        C = zeros(length(rows),length(revomap))
+        for i in 1:length(rows)
+            for (j,v) in rows[i]
+                C[i,j] = v
+            end
+        end
     end
+    @printf("Size of C is %s\n", size(C))
 
 
     @printf("Manipulating data structures -- ")
@@ -80,13 +86,14 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         end
 
         # separate the constant column from the rest
-        Cconst = full(C[:,1])
-        C = full(C[:,2:end])
+#        Cconst = full(C[:,1])
+#        C = full(C[:,2:end])
+        Cconst = C[:,1]
+        C = C[:,2:end]
         Oconst = O[1]
         O = O[2:end]
         mond = mond[2:end] # excluding constant term
         mondrev = [ mond[i]=>i for i in 1:length(mond) ] # XXX unused
-        dec = dec[2:end]
         # XXX omap
         revomap = revomap[2:end]
     end
@@ -107,16 +114,30 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Computing initial value: ")
     @time initial = vec(C \ Cconst)
 
+    # XXX TMP
+    big = 0
+    tot = 0
+
     # dual objective = primal constant-term
     @printf("Writing initial value: ")
     @time begin
         setobj!(sdp, 1, one, one, -1.0)
         for a in mon0d2
             for b in mon1d2
-                setobj!(sdp, 1, a, b, initial[omap[a*b]-1])
+#                setobj!(sdp, 1, a, b, initial[omap[a*b]-1])
+
+                # XXX TMP
+                val = initial[omap[a*b]-1]
+                tot += 1
+                if(abs(val) > 1e-8)
+                    big += 1
+                    setobj!(sdp, 1, a, b, val)
+                end
+
             end
         end
     end
+    @printf("Initial value: wrote %d of %d, density %f\n", big, tot, big/tot)
 
 
     # compute the nullspace
@@ -126,15 +147,28 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
 
     # dual constraints = primal building-blocks
+
+    # XXX tmp
+    big = 0
+    tot = 0
+
     @printf("Writing ideal basis -- ")
     @time for i in 1:size(B,2)
         
         # rewrite B[:,i] as a matrix in d/2 x d/2 moment decompositions
         for a in mon0d2
             for b in mon1d2
-                setcon!(sdp, i, 1, a, b, B[omap[a*b]-1, i])
+
+                val = B[omap[a*b]-1,i]
+                tot += 1
+                if(abs(val) > 1e-8)
+                    big += 1
+                    setcon!(sdp, i, 1, a, b, val)
+                end
             end
         end
+
+        @printf("done %d/%d constraints. wrote %d of %d, density %f\n", i, size(B,2), big, tot, big/tot)
 
         rhs = dot(O, B[:,i])
         setrhs!(sdp, i, rhs)
@@ -156,10 +190,24 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     # build & return a solution object
     @printf("Building solution object -- ")
     @time begin
-        moments = [ mond[j] => sol.dualmatrix[1, dec[j][1]...] for j in 1:length(mond) ]
-        moments[one] = 1.0
+        moments = [ one => 1.0 ]
+        for a in mon0d2
+            for b in mon1d2
+                moments[a*b] = sol.dualmatrix[1, a,b]
+            end
+        end
         SoSSolution(prog, d, sol.obj + adjust_obj, sol.dualobj + adjust_obj, moments, sol.primalmatrix)
     end
+end
+
+
+rowdist(r1,r2) = halfrowdist(r1,r2) + halfrowdist(r2,r1)
+function halfrowdist(r1 :: Dict{Int64,Float64}, r2 :: Dict{Int64,Float64})
+    dist = 0.0
+    for (k,v) in r1
+        dist += (v - get(r2,k,0.0))^2
+    end
+    return dist
 end
 
 
@@ -167,4 +215,5 @@ function count_monoms(prog :: Program, d :: Int64)
     n = length(prog.vars)
     binomial(d+n,d)
 end
+
 

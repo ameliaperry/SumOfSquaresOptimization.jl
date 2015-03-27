@@ -98,8 +98,9 @@ end
 
 
 
-#  Find all decompositions of mon into two monomials (m1,m2)
-#    each of degree at most degmax.
+# Find all decompositions of mon into two monomials (m1,m2), each of degree
+# at most degmax.
+# XXX currently unused
 function decomp(mon :: SoSMonom, degmax :: Int64)
     # maybe there's room for improvement here ...
     list = (SoSMonom,SoSMonom)[]
