@@ -25,7 +25,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         mond = vcat(monall...)
         mondrev = [ mond[i]=>i for i in 1:length(mond) ]
         mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 1 to d/2
-        mon1d2 = mon0d2[2:end]
     end
 
     
@@ -99,6 +98,17 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     end
 
 
+    @printf("Precomputing decomposition-to-orbit map -- ")
+    @time begin
+        domap = Dict{(Int64,Int64),Int64}()
+        for a in 1:length(mon0d2)
+            for b in 2:length(mon0d2)
+                domap[(a,b)] = omap[mon0d2[a]*mon0d2[b]]-1
+            end
+        end
+    end
+
+
     # set up problem & solver instance
     sdp = SparseSDP(maximize = !prog.maximize) # negate maximization, because our primal is the SDP dual
     if (solver == "sdpa")
@@ -111,29 +121,24 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     
     
     # find an initial solution for moments (not necessarily PSD)
-    @printf("Computing initial value: ")
+    @printf("Computing initial value -- ")
     @time initial = vec(C \ Cconst)
+
 
     # XXX TMP
     big = 0
     tot = 0
 
     # dual objective = primal constant-term
-    @printf("Writing initial value: ")
+    @printf("Writing initial value -- ")
     @time begin
         setobj!(sdp, 1, one, one, -1.0)
-        for a in mon0d2
-            for b in mon1d2
-#                setobj!(sdp, 1, a, b, initial[omap[a*b]-1])
-
-                # XXX TMP
-                val = initial[omap[a*b]-1]
-                tot += 1
-                if(abs(val) > 1e-8)
-                    big += 1
-                    setobj!(sdp, 1, a, b, val)
-                end
-
+        for ((a,b),orbit) in domap
+            val = initial[orbit]
+            tot += 1
+            if(abs(val) > 1e-8)
+                big += 1
+                setobj!(sdp, 1, a, b, val)
             end
         end
     end
@@ -141,14 +146,14 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
 
     # compute the nullspace
-    @printf("Computing ideal basis: ")
+    @printf("Computing ideal basis -- ")
     @time B = null(C)
 #    println(rref(C))
 
 
     # dual constraints = primal building-blocks
 
-    # XXX tmp
+    # XXX TMP
     big = 0
     tot = 0
 
@@ -156,15 +161,12 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @time for i in 1:size(B,2)
         
         # rewrite B[:,i] as a matrix in d/2 x d/2 moment decompositions
-        for a in mon0d2
-            for b in mon1d2
-
-                val = B[omap[a*b]-1,i]
-                tot += 1
-                if(abs(val) > 1e-8)
-                    big += 1
-                    setcon!(sdp, i, 1, a, b, val)
-                end
+        for ((a,b),orbit) in domap
+            val = B[orbit,i]
+            tot += 1
+            if(abs(val) > 1e-8)
+                big += 1
+                setcon!(sdp, i, 1, a, b, val)
             end
         end
 
@@ -191,9 +193,9 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @printf("Building solution object -- ")
     @time begin
         moments = [ one => 1.0 ]
-        for a in mon0d2
-            for b in mon1d2
-                moments[a*b] = sol.dualmatrix[1, a,b]
+        for i in 1:length(mon0d2)
+            for j in 2:length(mon0d2)
+                moments[mon0d2[i]*mon0d2[j]] = sol.dualmatrix[1, i,j]
             end
         end
         SoSSolution(prog, d, sol.obj + adjust_obj, sol.dualobj + adjust_obj, moments, sol.primalmatrix)
@@ -201,7 +203,13 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 end
 
 
-rowdist(r1,r2) = halfrowdist(r1,r2) + halfrowdist(r2,r1)
+function rowdist(r1,r2)
+    ret = halfrowdist(r1,r2) + halfrowdist(r2,r1)
+    if(ret < 0.001)
+        @printf("distance between %s and %s is %f\n", r1, r2, ret)
+    end
+    ret
+end
 function halfrowdist(r1 :: Dict{Int64,Float64}, r2 :: Dict{Int64,Float64})
     dist = 0.0
     for (k,v) in r1
