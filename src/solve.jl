@@ -30,9 +30,9 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @time omap, revomap = monom_orbits(vcat(monall...), prog.symmetries)
 
 
-    @printf("Writing constraint-by-moment matrix -- ")
+    @printf("Writing constraint-by-orbit matrix -- ")
     @time begin
-        # write the (sparse) constraint-by-moment occurence matrix C
+        # write the (sparse) constraint-by-orbit occurence matrix C
         rows = Dict{Int64,Float64}[]
         for poly in prog.constraints
             pd = deg(poly)
@@ -60,9 +60,11 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
         # transcribe the rows to a matrix
         # XXX we have to specify width `length(revomap)` in case higher moments /
-        # orbits don't show # up in the promoted constraints. In principle,
+        # orbits don't show up in the promoted constraints. In principle,
         # though, it'd make the linear algebra faster to exclude these columns,
-        # and manually re-include them after the linear algebra.
+        # and manually re-include them after the linear algebra. At some point we
+        # should do this; we can also reduce columns by joining orbits by
+        # equality constraints (e.g. hypercube constraints)
         # XXX we're not getting any mileage out of the sparsity here. Fix this.
         # We should be able to at least find `initial` using sparse QR, even if
         # we can't find the nullspace in a sparse-friendly way.
@@ -110,13 +112,16 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     
     # find an initial solution for moments (not necessarily PSD)
     @printf("Computing initial value -- ")
-    @time initial = vec(C \ Cconst)
+    @time if size(C,1) > 0
+        initial = vec(C \ Cconst)
+    else
+        initial = zeros(size(C,2))
+    end
 
 
     # compute the nullspace
     @printf("Computing ideal basis -- ")
     @time B = null(C)
-#    println(rref(C))
 
 
     # we will need to adjust our objective by the following constant term, which is missing from the SDP
@@ -128,7 +133,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
 
     # write objective value
-    objective_store=Float64[]
     @printf("Writing objective -- ")
     @time for i in 1:size(B,2)
         sdp_obj!(sdp, dot(O, B[:,i]))
