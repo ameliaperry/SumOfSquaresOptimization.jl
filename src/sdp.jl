@@ -79,27 +79,19 @@ function sdp_solve(sess :: SDPSession)
             end
 
         elseif beginswith(l, "Success: SDP is primal infeasible")
-            primalobj = sess.maximize ? Inf : -Inf
-            dualobj = sess.maximize ? Inf : -Inf
+            primalobj = dualobj = sess.maximize ? Inf : -Inf
             retcode = 1
             println("The program is dual infeasible.")
         
         elseif beginswith(l, "Success: SDP is dual infeasible")
-            primalobj = sess.maximize ? -Inf : Inf
-            dualobj = sess.maximize ? -Inf : Inf
+            primalobj = dualobj = sess.maximize ? -Inf : Inf
             retcode = 2
             println("The program is primal infeasible.")
 
         end
     end
 
-    # compute objective
-    if retcode != 1 && retcode != 2
-
-    end
-    
     dualvector = map(float, split(chomp(readline(outio))))
-    primalobj = dot(dualvector, sess.objective) + sess.offset
 
     primalmatrix = zeros(sess.nmoments, sess.nmoments)
     dualmatrix = zeros(sess.nmoments, sess.nmoments)
@@ -115,7 +107,12 @@ function sdp_solve(sess :: SDPSession)
             dualmatrix[j,i] = v
         end
     end
-    dualobj = primalobj # XXX this is no good. should we take the truncated CSDP output?
+    
+    # compute objective
+    if retcode != 1 && retcode != 2
+        primalobj = dot(dualvector, sess.objective) + sess.offset
+        dualobj = primalobj # XXX this is no good. should we take the truncated CSDP output?
+    end
 
     SDPSolution(primalobj, dualobj, primalmatrix, dualmatrix, retcode)
 end
