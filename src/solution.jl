@@ -7,7 +7,7 @@ type SoSSolution
     primalobj :: Float64
     dualobj :: Float64
     moments :: Dict{SoSMonom,Float64}
-    dualmatrix :: SemidefiniteProgramming.SparseSymmetricBlockMatrix{Float64}
+    dualmatrix :: Array{Float64,2}
 end
 
 function obj(sol :: SoSSolution)
@@ -81,7 +81,7 @@ end
 
 # This code processes the dual solution / SoS proof, and prints polynomials, the sum of
 # whose squares equals the dual polynomial (cf dualpoly()).
-# XXX currently unused and private
+# XXX currently unused, private, and broken
 function printsquares(sol :: SoSSolution; adjust=1.0, method=:svd, thresh=0.00001)
 
     # decode the dual matrix

@@ -1,7 +1,5 @@
 module SumOfSquaresOptimization
 
-importall SemidefiniteProgramming
-
 # sos.jl
 export Program
 export constraint, partconstraint, objective, partobjective
@@ -22,6 +20,7 @@ export symmetrize_cyclic!, symmetrize_dihedral!, symmetrize_hypercube!, symmetri
 
 include("monoms.jl")
 include("program.jl")
+include("sdp.jl")
 include("solve.jl")
 include("solution.jl")
 include("symmetrize.jl")

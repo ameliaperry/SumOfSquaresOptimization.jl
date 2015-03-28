@@ -22,14 +22,12 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @time begin
         # choose an order for indexing non-1 monomials
         monall = [ monoms(prog,i) for i in 0:d ]
-        mond = vcat(monall...)
-        mondrev = [ mond[i]=>i for i in 1:length(mond) ]
-        mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 1 to d/2
+        mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 0 to d/2
     end
 
     
     @printf("Symmetrizing monomials -- ")
-    @time omap, revomap = monom_orbits(mond, prog.symmetries)
+    @time omap, revomap = monom_orbits(vcat(monall...), prog.symmetries)
 
 
     @printf("Writing constraint-by-moment matrix -- ")
@@ -93,8 +91,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         C = C[:,2:end]
         Oconst = O[1]
         O = O[2:end]
-        mond = mond[2:end] # excluding constant term
-        mondrev = [ mond[i]=>i for i in 1:length(mond) ] # XXX unused
         # XXX omap
         revomap = revomap[2:end]
     end
@@ -104,47 +100,17 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     @time begin
         domap = Dict{(Int64,Int64),Int64}()
         for a in 1:length(mon0d2)
-            for b in 2:length(mon0d2)
+            for b in max(a,2):length(mon0d2)
                 domap[(a,b)] = omap[mon0d2[a]*mon0d2[b]]-1
             end
         end
     end
 
-
-    # set up problem & solver instance
-    sdp = SparseSDP(maximize = !prog.maximize) # negate maximization, because our primal is the SDP dual
-    if (solver == "sdpa")
-        solverinst = SDPA()
-    elseif (solver == "csdp")
-        solverinst = CSDP()
-    else
-        throw(ArgumentError("Unsupported solver."))
-    end
     
     
     # find an initial solution for moments (not necessarily PSD)
     @printf("Computing initial value -- ")
     @time initial = vec(C \ Cconst)
-
-
-    # XXX TMP
-    big = 0
-    tot = 0
-
-    # dual objective = primal constant-term
-    @printf("Writing initial value -- ")
-    @time begin
-        setobj!(sdp, 1, 1, 1, -1.0)
-        for ((a,b),orbit) in domap
-            val = initial[orbit]
-            tot += 1
-            if(abs(val) > 1e-8)
-                big += 1
-                setobj!(sdp, 1, a, b, val)
-            end
-        end
-    end
-    @printf("Initial value: wrote %d of %d, density %f\n", big, tot, big/tot)
 
 
     # compute the nullspace
@@ -153,8 +119,43 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 #    println(rref(C))
 
 
-    # dual constraints = primal building-blocks
+    # we will need to adjust our objective by the following constant term, which is missing from the SDP
+    adjust_obj = Oconst - dot(O, initial)
 
+
+    # set up problem & solver instance
+    sdp = SDPSession(prog.maximize, size(B,2), length(mon0d2), adjust_obj)
+
+
+    # write objective value
+    objective_store=Float64[]
+    @printf("Writing objective -- ")
+    @time for i in 1:size(B,2)
+        sdp_obj!(sdp, dot(O, B[:,i]))
+    end
+
+
+    # dual objective = primal constant-term
+    # XXX TMP
+    big = 0
+    tot = 0
+
+    @printf("Writing initial value -- ")
+    @time begin
+        sdp_con!(sdp, 0, 1, 1, -1.0)
+        for ((a,b),orbit) in domap
+            val = initial[orbit]
+            tot += 1
+            if(abs(val) > 1e-8)
+                big += 1
+                sdp_con!(sdp, 0, a, b, val)
+            end
+        end
+    end
+    @printf("Initial value: wrote %d of %d, density %f\n", big, tot, big/tot)
+
+
+    # dual constraints = primal building-blocks
     # XXX TMP
     big = 0
     tot = 0
@@ -168,39 +169,33 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
             tot += 1
             if(abs(val) > 1e-8)
                 big += 1
-                setcon!(sdp, i, 1, a, b, val)
+                sdp_con!(sdp, i, a, b, val)
             end
         end
 
         @printf("done %d/%d constraints. wrote %d of %d, density %f\n", i, size(B,2), big, tot, big/tot)
-
-        rhs = dot(O, B[:,i])
-        setrhs!(sdp, i, rhs)
     end
 
 
-    # we will need to adjust our objective by the following constant term, which is missing from the SDP
-    adjust_obj = Oconst - dot(O, initial)
+    # free some memory
+    C = Cconst = O = Oconst = B = initial = monall = mond = mondrev = omap = revomap = domap = 0 # free some memory
 
 
     # solve the SDP
-    nvars = count_monoms(prog, div(d,2))
-    @printf("Solving SDP with %d^2 entries and %d constraints... ", count_monoms(prog, div(d,2)), size(B,2))
-    
-    CI = CJ = CV = C = Cconst = O = Oconst = B = initial = monall = mondrev = omap = revomap = 0 # free some memory
-    @time sol = solve(sdp, solverinst)
+    @printf("Solving SDP with %d^2 entries and %d constraints... ", sdp.nmoments, sdp.nconstraints)
+    @time sol = sdp_solve(sdp)
 
 
     # build & return a solution object
     @printf("Building solution object -- ")
     @time begin
-        moments = [ one => 1.0 ]
+        moments = Dict{SoSMonom,Float64}()
         for i in 1:length(mon0d2)
-            for j in 2:length(mon0d2)
-                moments[mon0d2[i]*mon0d2[j]] = sol.dualmatrix[1, i,j]
+            for j in i:length(mon0d2)
+                moments[mon0d2[i]*mon0d2[j]] = sol.primalmatrix[i,j]
             end
         end
-        SoSSolution(prog, d, sol.obj + adjust_obj, sol.dualobj + adjust_obj, moments, sol.primalmatrix)
+        SoSSolution(prog, d, sol.primalobj, sol.dualobj, moments, sol.dualmatrix)
     end
 end
 
@@ -213,11 +208,4 @@ function halfrowdist(r1 :: Dict{Int64,Float64}, r2 :: Dict{Int64,Float64})
     end
     return dist
 end
-
-
-function count_monoms(prog :: Program, d :: Int64)
-    n = length(prog.vars)
-    binomial(d+n,d)
-end
-
 
