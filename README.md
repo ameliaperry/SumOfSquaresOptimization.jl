@@ -53,12 +53,6 @@ There are probably still a lot of issues with this code, and feel free to let me
 
 One issue I've encountered is that `csdp` doesn't seem to accept more than 23169 constraints in some compiled 32-bit versions. I've worked on reducing the number of constraints, so I expect this isn't too much of a barrier anymore. Hinting any symmetries of your program will reduce the number of SDP constraints handed to the solver.
 
-
 ## todo
-* actually test `sdpa` support
-* pretty-print the moments
-* pretty-print Psatz refutation
-* write tests
-* investigate the JuliaOpt SDP packages and compare
-* any way to do high-precision solution, leveraging Julia's `BigFloat` and multi-precision SDPA?
+See the GitHub issues section.
 
