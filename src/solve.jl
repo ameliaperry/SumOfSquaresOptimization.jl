@@ -48,7 +48,8 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
                     row = Dict{Int64,Float64}()
                     for (k,v) in poly
-                        row[omap[k*monom]] = v
+                        key = omap[k*monom]
+                        row[key] = v + get(row,key,0.0)
                     end
                     # only add this row if it's actually new
                     if !any(o -> rowdist(row,o) < 1e-8, rows)
@@ -133,7 +134,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
     # dual objective = primal constant-term
     @printf("Writing initial value -- ")
     @time begin
-        setobj!(sdp, 1, one, one, -1.0)
+        setobj!(sdp, 1, 1, 1, -1.0)
         for ((a,b),orbit) in domap
             val = initial[orbit]
             tot += 1
