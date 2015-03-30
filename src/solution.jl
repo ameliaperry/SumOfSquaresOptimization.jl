@@ -7,6 +7,7 @@ type SoSSolution
     primalobj :: Float64
     dualobj :: Float64
     moments :: Dict{SoSMonom,Float64}
+    primalmatrix :: Array{Float64,2}
     dualmatrix :: Array{Float64,2}
 end
 

@@ -199,7 +199,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
                 moments[mon0d2[i]*mon0d2[j]] = sol.primalmatrix[i,j]
             end
         end
-        SoSSolution(prog, d, sol.primalobj, sol.dualobj, moments, sol.dualmatrix)
+        SoSSolution(prog, d, sol.primalobj, sol.dualobj, moments, sol.primalmatrix, sol.dualmatrix)
     end
 end
 
