@@ -102,6 +102,7 @@ function sdp_solve(sess :: SDPSession)
         v = float(toks[5])
         if int(toks[1]) == 1
             primalmatrix[i,j] = v
+            primalmatrix[j,i] = v
         else
             dualmatrix[i,j] = v
             dualmatrix[j,i] = v
