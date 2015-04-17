@@ -69,6 +69,7 @@ function sdp_solve(sess :: SDPSession)
 
     # note: our primal is CSDP's dual, so everything here is flipped that way
     for l in eachline(`csdp $(sess.fname) $outfname`)
+        print(l)
 
         if beginswith(l, "Failure: return code is ")
             retcode = int(strip(split(l, "is ")[2]))
