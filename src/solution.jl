@@ -67,13 +67,13 @@ end
 # objective value, and is a sum of squares.
 # XXX currently unused and private
 function dualpoly(sol :: SoSSolution)
-    dm = sol.dualmatrix
-    mon = vcat( [ SumOfSquaresOptimization.monoms(sol.prog,i) for i in 0:div(deg,2) ] ... )
+    mon = vcat( [ monoms(sol.prog,i) for i in 0:div(sol.degree,2) ] ... )
 
-    po = SumOfSquaresOptimization.SoSPoly()
-    for i in mon
-        for j in mon
-            po[i*j] = get(po,i*j,0.0) + dm[1][i,j]
+    po = SoSPoly()
+    for i in 1:length(mon)
+        for j in 1:length(mon)
+            prod = mon[i] * mon[j]
+            po[prod] = get(po, prod, 0.0) + sol.dualmatrix[i,j]
         end
     end
     po
