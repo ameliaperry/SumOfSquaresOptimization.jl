@@ -60,16 +60,36 @@ symmetrize!(prog :: Program, genperms :: Array{Dict{Symbol,Symbol}}) = append!(p
 symmetrize!(prog :: Program, genperm :: Dict{Symbol,Symbol}) = push!(prog.symmetries, genperm)
 
 # symmetry according to dihedral group (rotation and reflection)
-function symmetrize_dihedral!(prog :: Program, cycle :: Array{Symbol})
-    n = length(cycle)
-    symmetrize!(prog, [ cycle[i] => cycle[(i % n) + 1] for i in 1:n ]) # rotate
-    symmetrize!(prog, [ cycle[i] => cycle[n + 1 - i] for i in 1:n ]) # reflect
+function symmetrize_dihedral!(prog :: Program, cycles...)
+    n = length(cycles[1])
+
+    symmetrize_cyclic!(prog, cycles...)
+    
+    if n >= 2
+        reflect = Dict{Symbol,Symbol}()
+        for cycle in cycles
+            for i in 1:n
+                reflect[cycle[i]] = cycle[n-i+1]
+            end
+        end
+        symmetrize!(prog, reflect)
+    end
 end
 
 # symmetry according to cyclic group (rotation only)
-function symmetrize_cyclic!(prog :: Program, cycle :: Array{Symbol})
-    n = length(cycle)
-    symmetrize!(prog, [ cycle[i] => cycle[(i % n) + 1] for i in 1:n ]) # rotate
+function symmetrize_cyclic!(prog :: Program, cycles...)
+    n = length(cycles[1])
+
+    if n >= 2
+        rotate = Dict{Symbol,Symbol}()
+        for cycle in cycles
+            for i in 0:(n-1)
+                j = (i+1) % n
+                rotate[cycle[i+1]] = cycle[j+1]
+            end
+        end
+        symmetrize!(prog, rotate)
+    end
 end
 
 # symmetry according to hyperoctahedral group
@@ -123,11 +143,19 @@ function symmetrize_hypercube!(prog :: Program, cubes...)
 end
 
 # symmetry according to full symmetric group
-function symmetrize_full!(prog :: Program, syms :: Array{Symbol})
-    n = length(syms)
-    if(n < 2) return end
-    rotate = (Symbol=>Symbol)[ syms[i] => syms[(i % n) + 1] for i in 1:n ]
-    transpose = (Symbol=>Symbol)[ syms[1] => syms[2], syms[2] => syms[1] ]
-    symmetrize!(prog, [rotate,transpose])
+function symmetrize_full!(prog :: Program, symsets...)
+    n = length(symsets[1])
+    if n < 2 return end
+        
+    transpose = Dict{Symbol,Symbol}()
+    for set in symsets
+        transpose[set[1]] = set[2]
+        transpose[set[2]] = set[1]
+    end
+    symmetrize!(prog, transpose)
+
+    if n >= 3
+        symmetrize_cyclic!(program, symsets...)
+    end
 end
 
