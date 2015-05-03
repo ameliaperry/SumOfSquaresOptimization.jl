@@ -49,7 +49,13 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
                         key = omap[k*monom]
                         row[key] = v + get(row,key,0.0)
                     end
+
                     # only add this row if it's actually new
+                    # XXX this is currently a major source of inefficiency! can we improve
+                    # this without resorting to a full nearest-neighbor data structure?
+                    # maybe hash constraints, exploiting the fact that duplicated rows will
+                    # probably be bit-equal, not just epsilon-close, and that we don't have
+                    # to be perfect...
                     if !any(o -> rowdist(row,o) < 1e-8, rows)
                         push!(rows,row)
                     end
@@ -64,7 +70,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
         # though, it'd make the linear algebra faster to exclude these columns,
         # and manually re-include them after the linear algebra. At some point we
         # should do this; we can also reduce columns by joining orbits by
-        # equality constraints (e.g. hypercube constraints)
+        # equality constraints (e.g. boolean constraints)
         # XXX we're not getting any mileage out of the sparsity here. Fix this.
         # We should be able to at least find `initial` using sparse QR, even if
         # we can't find the nullspace in a sparse-friendly way.
@@ -126,7 +132,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
     # we will need to adjust our objective by the following constant term, which is missing from the SDP
     adjust_obj = Oconst - dot(O, initial)
-
 
     # set up problem & solver instance
     sdp = SDPSession(prog.maximize, size(B,2), length(mon0d2), adjust_obj)
@@ -204,7 +209,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 end
 
 
-rowdist(r1,r2)= halfrowdist(r1,r2) + halfrowdist(r2,r1)
+rowdist(r1,r2) = halfrowdist(r1,r2) + halfrowdist(r2,r1)
 function halfrowdist(r1 :: Dict{Int64,Float64}, r2 :: Dict{Int64,Float64})
     dist = 0.0
     for (k,v) in r1
