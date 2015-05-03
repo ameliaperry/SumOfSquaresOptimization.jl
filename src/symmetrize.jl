@@ -79,17 +79,16 @@ end
 # symmetry according to cyclic group (rotation only)
 function symmetrize_cyclic!(prog :: Program, cycles...)
     n = length(cycles[1])
+    if n < 2 return end
 
-    if n >= 2
-        rotate = Dict{Symbol,Symbol}()
-        for cycle in cycles
-            for i in 0:(n-1)
-                j = (i+1) % n
-                rotate[cycle[i+1]] = cycle[j+1]
-            end
+    rotate = Dict{Symbol,Symbol}()
+    for cycle in cycles
+        for i in 0:(n-1)
+            j = (i+1) % n
+            rotate[cycle[i+1]] = cycle[j+1]
         end
-        symmetrize!(prog, rotate)
     end
+    symmetrize!(prog, rotate)
 end
 
 # symmetry according to hyperoctahedral group
@@ -155,7 +154,7 @@ function symmetrize_full!(prog :: Program, symsets...)
     symmetrize!(prog, transpose)
 
     if n >= 3
-        symmetrize_cyclic!(program, symsets...)
+        symmetrize_cyclic!(prog, symsets...)
     end
 end
 
