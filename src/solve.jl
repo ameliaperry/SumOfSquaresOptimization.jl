@@ -4,7 +4,7 @@
 
 
 #  Make the magic happen.
-function sossolve(prog :: Program, d :: Int64; solver="csdp")
+function sossolve(prog :: Program, d :: Int64; solver="csdp"; call="csdp")
 
     # sanity check
     if(d <= 0)
@@ -51,11 +51,11 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
                     end
 
                     # only add this row if it's actually new
-                    # XXX this is currently a major source of inefficiency! can we improve
+                    # XXX this is currently a source of inefficiency! can we improve
                     # this without resorting to a full nearest-neighbor data structure?
-                    # maybe hash constraints, exploiting the fact that duplicated rows will
+                    # maybe keep a set of constraints, exploiting the fact that duplicated rows will
                     # probably be bit-equal, not just epsilon-close, and that we don't have
-                    # to be perfect...
+                    # to be perfect about removing redundancies...
                     if !any(o -> rowdist(row,o) < 1e-8, rows)
                         push!(rows,row)
                     end
@@ -192,7 +192,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp")
 
     # solve the SDP
     @printf("Solving SDP with %d^2 entries and %d constraints... ", sdp.nmoments, sdp.nconstraints)
-    @time sol = sdp_solve(sdp)
+    @time sol = sdp_solve(sdp,call=call)
 
 
     # build & return a solution object

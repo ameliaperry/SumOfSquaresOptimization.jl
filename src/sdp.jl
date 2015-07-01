@@ -59,7 +59,7 @@ csdp_messages = [
     "Failure: detected NaN on Inf values."
 ]
 
-function sdp_solve(sess :: SDPSession)
+function sdp_solve(sess :: SDPSession; call="csdp")
     close(sess.io)
     outfname, outio = mktemp()
 
@@ -68,7 +68,7 @@ function sdp_solve(sess :: SDPSession)
     retcode = 0
 
     # note: our primal is CSDP's dual, so everything here is flipped that way
-    for l in eachline(`csdp $(sess.fname) $outfname`)
+    for l in eachline(`$call $(sess.fname) $outfname`)
         print(l)
 
         if beginswith(l, "Failure: return code is ")
