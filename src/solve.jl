@@ -4,7 +4,7 @@
 
 
 #  Make the magic happen.
-function sossolve(prog :: Program, d :: Int64; solver="csdp"; call="csdp")
+function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
     # sanity check
     if(d <= 0)
