@@ -66,7 +66,7 @@ end
 
 #  Degree of monomial / polynomial
 deg(m :: SoSMonom) = sum(values(m))
-deg(p :: SoSPoly) = maximum([deg(k) for (k,v) in p])
+deg(p :: SoSPoly) = length(p) == 0 ? 0 : maximum([deg(k) for (k,v) in p]) 
 
 
 #  Enumerate all monomials of degree d.
