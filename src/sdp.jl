@@ -61,6 +61,11 @@ csdp_messages = [
 
 function sdp_solve(sess :: SDPSession; call="csdp")
     close(sess.io)
+
+    if nconstraints == 0
+        return SDPSolution(sess.offset, sess.offset, zeros(sess.nmoments, sess.nmoments), zeros(sess.nmoments, sess.nmoments), 0)
+    end
+
     outfname, outio = mktemp()
 
     primalobj = NaN
