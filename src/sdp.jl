@@ -9,7 +9,7 @@
 type SDPSession
     maximize :: Bool
     nmoments :: Int64
-    initval :: Array{Float64,2}
+    initval :: SparseMatrixCSC{Float64,Int64}
     nconstraints :: Int64
     constraints_missing_objective :: Int64
     objective :: Array{Float64,1}
