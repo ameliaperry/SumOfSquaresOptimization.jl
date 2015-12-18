@@ -157,7 +157,7 @@ end
 
 # Dumps a solution to stdout.
 
-function dump(sol :: SoSSolution)
+function dumpsol(sol :: SoSSolution)
     println("Objective:")
     println(sol.primalobj)
     println("Moments:")

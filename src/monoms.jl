@@ -17,7 +17,7 @@ one = Dict{Symbol,Int64}() :: SoSMonom
 #    there should be a faster sum here that manages iterators, a la mergesort
 function *(a::SoSMonom, b::SoSMonom)
     # A, including overlap with B
-    map = [k => (v + get(b,k,0)) for (k,v) in a] :: SoSMonom
+    map = Dict([ k => (v + get(b,k,0)) for (k,v) in a ]) :: SoSMonom
     # B \ A
     for (k,v) in b
         if(! haskey(a,k))
@@ -32,7 +32,7 @@ end
 #    also, this is the same code as multiplication of SosMonoms -- make non-redundant
 function +(a::SoSPoly, b::SoSPoly)
     # A, including overlap with B
-    map = [k => (v + get(b,k,0)) for (k,v) in a] :: SoSPoly
+    map = Dict([ k => (v + get(b,k,0)) for (k,v) in a ]) :: SoSPoly
     # B \ A
     for (k,v) in b
         if(! haskey(a,k))
@@ -114,7 +114,7 @@ function decomp(mon :: SoSMonom, degmax :: Int64)
         for m1 in monoms(varr,deg)
 
             # construct the complement
-            m2 = [k=>(v-get(m1,k,0)) for (k,v) in mon]
+            m2 = Dict([ k => (v-get(m1,k,0)) for (k,v) in mon ])
 
             # test for being sensible (ie non-negative exponents), and remove any zero entries
             if(length(m2) > 0 && minimum(values(m2)) < 0)

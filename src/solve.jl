@@ -106,7 +106,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
     @printf("Precomputing decomposition-to-orbit map -- ")
     @time begin
-        domap = Dict{(Int64,Int64),Int64}()
+        domap = Dict{Tuple{Int64,Int64},Int64}()
         for a in 1:length(mon0d2)
             for b in max(a,2):length(mon0d2)
                 domap[(a,b)] = omap[mon0d2[a]*mon0d2[b]]-1
@@ -127,7 +127,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
     # compute the nullspace
     @printf("Computing ideal basis -- ")
-    @time B = null(C)
+    @time B = nullspace(C)
 
 
     # we will need to adjust our objective by the following constant term, which is missing from the SDP

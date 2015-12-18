@@ -14,7 +14,7 @@ type SDPSession
     constraints_missing_objective :: Int64
     objective :: Array{Float64,1}
     offset :: Float64
-    fname :: String
+    fname :: AbstractString
     io :: IO
 end
 SDPSession(maximize, nconstraints, nmoments, offset) = SDPSession(maximize, nmoments, spzeros(nmoments,nmoments), nconstraints, nconstraints, Float64[], offset, sdp_init(nconstraints,nmoments)...)
@@ -90,7 +90,7 @@ function sdp_solve(sess :: SDPSession; call="csdp")
     for l in eachline(`$call $(sess.fname) $outfname`)
         print(l)
 
-        if beginswith(l, "Failure: return code is ")
+        if startswith(l, "Failure: return code is ")
             retcode = int(strip(split(l, "is ")[2]))
             if retcode > 0 && retcode <= length(csdp_messages)
                 println(csdp_messages[retcode])
@@ -98,12 +98,12 @@ function sdp_solve(sess :: SDPSession; call="csdp")
                 println("Unrecognized return value.")
             end
 
-        elseif beginswith(l, "Success: SDP is primal infeasible")
+        elseif startswith(l, "Success: SDP is primal infeasible")
             primalobj = dualobj = sess.maximize ? Inf : -Inf
             retcode = 1
             println("The program is dual infeasible.")
         
-        elseif beginswith(l, "Success: SDP is dual infeasible")
+        elseif startswith(l, "Success: SDP is dual infeasible")
             primalobj = dualobj = sess.maximize ? -Inf : Inf
             retcode = 2
             println("The program is primal infeasible.")
@@ -117,10 +117,10 @@ function sdp_solve(sess :: SDPSession; call="csdp")
     dualmatrix = zeros(sess.nmoments, sess.nmoments)
     for l in eachline(outio)
         toks = split(chomp(l), " ")
-        i = int(toks[3])
-        j = int(toks[4])
-        v = float(toks[5])
-        if int(toks[1]) == 1
+        i = parse(Int,toks[3])
+        j = parse(Int,toks[4])
+        v = parse(Float64,toks[5])
+        if parse(Int,toks[1]) == 1
             primalmatrix[i,j] = v
             primalmatrix[j,i] = v
         else

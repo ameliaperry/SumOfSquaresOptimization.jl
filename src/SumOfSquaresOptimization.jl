@@ -1,4 +1,6 @@
 module SumOfSquaresOptimization
+import Compat
+importall Base.Operators
 
 # sos.jl
 export Program
@@ -11,7 +13,7 @@ export sossolve
 
 # solution.jl
 export SoSSolution
-export dump, obj, primalobj, dualobj
+export dumpsol, obj, primalobj, dualobj
 export moment, @moment
 
 # symmetrize.jl

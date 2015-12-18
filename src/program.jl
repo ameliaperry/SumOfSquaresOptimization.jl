@@ -24,17 +24,17 @@ slackvar(prog :: Program) = symbol( @sprintf("slack%d", prog.slackvars += 1) )
 # convenience
 monoms(prog :: Program, d :: Int64) = monoms([prog.vars...], d)
 
-typealias Maybe{T} Union(T,Nothing)
+typealias Maybe{T} Union{T,Void}
 
 
 #  Parse a polynomial (in Expr form) into a SoSPoly, by traversing
 #    a Julia syntax tree.
 
-parsepoly{T<:Number}(prog :: Maybe{Program}, ex :: T) = [ one => convert(Float64, ex) ] :: SoSPoly
+parsepoly{T<:Number}(prog :: Maybe{Program}, ex :: T) = Dict( one => convert(Float64, ex) ) :: SoSPoly
 
 function parsepoly(prog :: Maybe{Program}, ex::Symbol)
     prog == nothing || push!(prog.vars, ex)
-    [[ex => 1] => 1.0] :: SoSPoly
+    Dict(Dict(ex => 1) => 1.0) :: SoSPoly
 end
 
 
@@ -108,7 +108,7 @@ end
 function perturb_objective(prog,tol,deg)
     for md in 1:deg
         for mon in monoms(prog,md)
-            poly = [ mon => tol * randn() ] :: SoSPoly
+            poly = Dict( mon => tol * randn() ) :: SoSPoly
             prog.objective += poly
         end
     end
@@ -123,7 +123,7 @@ function perturb_objective_sparse(prog,tol,s,deg)
     for i in 1:s
         idx = rand(1:length(mon))
         m = mon[idx]
-        poly = [ m => tol * randn() ] :: SoSPoly
+        poly = Dict( m => tol * randn() ) :: SoSPoly
         prog.objective += poly
     end
 end
