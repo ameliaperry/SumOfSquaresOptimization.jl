@@ -1,5 +1,4 @@
 module SumOfSquaresOptimization
-import Compat
 importall Base.Operators
 
 # sos.jl
