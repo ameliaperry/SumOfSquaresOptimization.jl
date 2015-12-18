@@ -9,6 +9,7 @@
 type SDPSession
     maximize :: Bool
     nmoments :: Int64
+    initval :: Array{Float64,2}
     nconstraints :: Int64
     constraints_missing_objective :: Int64
     objective :: Array{Float64,1}
@@ -16,7 +17,7 @@ type SDPSession
     fname :: String
     io :: IO
 end
-SDPSession(maximize, nconstraints, nmoments, offset) = SDPSession(maximize, nmoments, nconstraints, nconstraints, Float64[], offset, sdp_init(nconstraints,nmoments)...)
+SDPSession(maximize, nconstraints, nmoments, offset) = SDPSession(maximize, nmoments, spzeros(nmoments,nmoments), nconstraints, nconstraints, Float64[], offset, sdp_init(nconstraints,nmoments)...)
 
 type SDPSolution
     primalobj :: Float64
@@ -43,6 +44,13 @@ function sdp_obj!(sess :: SDPSession, val :: Float64)
 end
 
 function sdp_con!(sess :: SDPSession, con :: Int64, i :: Int64, j :: Int64, val :: Float64)
+    if con > sess.nconstraints || con < 0
+        throw(ArgumentError("invalid constraint number $con ($(sess.nconstraints) expected"))
+    end
+    if sess.nconstraints == 0 
+        sess.initval[i,j] = val
+        sess.initval[j,i] = val
+    end
     @printf(sess.io, "%d 1 %d %d %.18e\n", con, i, j, val)
 end
 
@@ -62,8 +70,14 @@ csdp_messages = [
 function sdp_solve(sess :: SDPSession; call="csdp")
     close(sess.io)
 
-    if nconstraints == 0
-        return SDPSolution(sess.offset, sess.offset, zeros(sess.nmoments, sess.nmoments), zeros(sess.nmoments, sess.nmoments), 0)
+    if sess.nconstraints == 0
+        eigmin = eigs(-A; nev=1, which=:LR)[1][1] # least eigenvalue
+        if eigmin > -1e-9 # feasible
+            return sdpsolution(0.0,0.0,zeros(sess.nmoments,sess.nmoments),zeros(sess.nmoments,sess.nmoments),0)
+        else # infeasible
+            obj = sess.maximize ? -Inf : Inf
+            return sdpsolution(obj,obj,zeros(sess.nmoments,sess.nmoments),zeros(sess.nmoments,sess.nmoments),1)
+        end
     end
 
     outfname, outio = mktemp()
