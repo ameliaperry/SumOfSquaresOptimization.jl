@@ -30,6 +30,8 @@ function moment(sol :: SoSSolution, monom :: SoSMonom)
        throw(ArgumentError("Requested moment degree is higher than solution degree"))
     elseif !haskey(sol.moments, monom)
        throw(ArgumentError("Requested moment is not described by this SoS solution"))
+    elseif isinf(sol.primalobj)
+        throw(ArgumentError("The program was infeasible -- moments are not available."))
     end
 
     sol.moments[monom]
