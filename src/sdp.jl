@@ -73,7 +73,7 @@ function sdp_solve(sess :: SDPSession; call="csdp")
     if sess.nconstraints == 0
         eigmin = eigs(-sess.initval; nev=1, which=:LR)[1][1] # least eigenvalue
         if eigmin > -1e-9 # feasible
-            return SDPSolution(0.0,0.0,zeros(sess.nmoments,sess.nmoments),zeros(sess.nmoments,sess.nmoments),0)
+            return SDPSolution(sess.offset,sess.offset,dense(-sess.initval),zeros(sess.nmoments,sess.nmoments),0)
         else # infeasible
             obj = sess.maximize ? -Inf : Inf
             return SDPSolution(obj,obj,zeros(sess.nmoments,sess.nmoments),zeros(sess.nmoments,sess.nmoments),1)
