@@ -22,7 +22,7 @@ for i in 1:5
 end
 
 sol = sossolve(prog,4) # 4 indicates degree
-dump(sol)
+dumpsol(sol)
 ```
 
 ## functions
@@ -36,7 +36,7 @@ There are also function analogues for plain strings: `constraint`, `objective`, 
 
 The following will solve a polynomial system and access a solution:
 * `sossolve(sos, deg)` solves the program, returning a solution object. You can optionally specify `solver="csdp"` or `solver="sdpa"`, with `csdp` being the default. One of these two must be installed.
-* `dump(sol)` outputs the objective, moments, and dual matrix to `stdout`. These will be more readable in the future.
+* `dumpsol(sol)` outputs the objective, moments, and dual matrix to `stdout`. These will be more readable in the future.
 * `@moment(sol, fmt, ...)` outputs the pseudo-expectation of the given polynomial, specified in `printf` style.
 * `primalobj(sol)` and `dualobj(sol)` return the objective values (which are hopefully equal).
 
