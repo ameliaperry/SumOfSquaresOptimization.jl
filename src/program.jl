@@ -60,7 +60,7 @@ function parsepoly(prog :: Maybe{Program}, ex :: Expr)
             end
         elseif(ex.args[1] == :(^))
             if(! isa(ex.args[3],Int64) || ex.args[3] < 0)
-                throw(ArgumentError(@sprintf("Bad exponent: %s. Exponents must be non-negative integers", args[3])))
+                throw(ArgumentError("Bad exponent: $(args[3]). Exponents must be non-negative integers"))
             elseif(ex.args[3] == 0)
                 return parsepoly(prog, 1)
             end
@@ -73,7 +73,7 @@ function parsepoly(prog :: Maybe{Program}, ex :: Expr)
         end
         return parsepoly(prog, ex.args[2]) # assume it's a 1-line block
     end
-    throw(ArgumentError(@sprintf("Expression not understood as polynomial: %s", ex)))
+    throw(ArgumentError("Expression not understood as polynomial: $ex"))
 end
 
 

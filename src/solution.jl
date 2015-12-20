@@ -11,15 +11,9 @@ type SoSSolution
     dualmatrix :: Array{Float64,2}
 end
 
-function obj(sol :: SoSSolution)
-    sol.primalobj
-end
-function primalobj(sol :: SoSSolution)
-    sol.primalobj
-end
-function dualobj(sol :: SoSSolution)
-    sol.dualobj
-end
+obj(sol :: SoSSolution) = sol.primalobj
+primalobj(sol :: SoSSolution) = sol.primalobj
+dualobj(sol :: SoSSolution) = sol.dualobj
 
 
 # Extracts moments from a solution.
@@ -37,21 +31,9 @@ function moment(sol :: SoSSolution, monom :: SoSMonom)
     sol.moments[monom]
 end
 
-function moment(sol :: SoSSolution, poly :: SoSPoly)
-    tot = 0.0
-    for (monom,coeff) in poly
-        tot += moment(sol, monom) * coeff
-    end
-    tot
-end
-
-function moment(sol :: SoSSolution, poly :: Expr)
-    moment(sol, parsepoly(nothing, poly))
-end
-
-function moment(sol :: SoSSolution, symb :: Symbol)
-    moment(sol, parsepoly(nothing, symb))
-end
+moment(sol :: SoSSolution, poly :: SoSPoly) = sum([ moment(sol,monom) * coeff for (monom,coeff) in poly ])
+moment(sol :: SoSSolution, poly :: Expr) = moment(sol, parsepoly(nothing, poly))
+moment(sol :: SoSSolution, symb :: Symbol) = moment(sol, parsepoly(nothing, symb))
 
 macro moment(sol, args...)
     escargs = [esc(x) for x in args[2:end]]
@@ -112,7 +94,7 @@ function printsquares(sol :: SoSSolution; adjust=1.0, method=:svd, thresh=0.0000
             end
 
             # make the poly
-            s = SumOfSquaresOptimization.SoSPoly()
+            s = SoSPoly()
             for j in 1:size(mtx,1)
                 if abs(vec[j]) < thresh
                     continue
@@ -142,7 +124,7 @@ function printsquares(sol :: SoSSolution; adjust=1.0, method=:svd, thresh=0.0000
             end
 
             # make the poly
-            s = SumOfSquaresOptimization.SoSPoly()
+            s = SoSPoly()
             for j in 1:size(mtx,1)
                 coeff = sv[:U][j,i] * sc
                 if(abs(coeff) >= thresh)
@@ -158,7 +140,6 @@ end
 
 
 # Dumps a solution to stdout.
-
 function dumpsol(sol :: SoSSolution)
     println("Objective:")
     println(sol.primalobj)

@@ -120,6 +120,10 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
     @printf("Computing initial value -- ")
     @time if size(C,1) > 0
         initial = vec(C \ Cconst)
+        # test that this is actually a solution
+        if norm(Cconst - C * initial) > 1e-6
+            #  XXX TODO
+        end
     else
         initial = zeros(size(C,2))
     end

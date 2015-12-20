@@ -1,13 +1,11 @@
 # symmetrization
 
-function act(mon :: SoSMonom, perm :: Dict{Symbol,Symbol})
+act(mon :: SoSMonom, perm :: Dict{Symbol,Symbol}) =
     [ get(perm,k,k) => v for (k,v) in mon ] :: SoSMonom
-end
 
 # XXX currently unused
-function act(poly :: SoSPoly, perm :: Dict{Symbol,Symbol})
+act(poly :: SoSPoly, perm :: Dict{Symbol,Symbol}) =
     [ act(k,perm) => v for (k,v) in poly ] :: SoSPoly
-end
 
 # maps monomials to their orbits; returns maps in both directions
 # note: this is roughly order-preserving, at least to the extent that the first
@@ -101,13 +99,7 @@ function symmetrize_hypercube!(prog :: Program, cubes...)
 
     # reflection along first coordinate
     if n >= 2
-        refl = Dict{Symbol,Symbol}()
-        for cube in cubes
-            for i in 0:(n-1)
-                j = i $ 1
-                refl[cube[i+1]] = cube[j+1]
-            end
-        end
+        refl = [ i => (i$1) for i in 0:(n-1) ] :: Dict{Symbol,Symbol}
         symmetrize!(prog, refl)
     end
 
@@ -146,12 +138,7 @@ function symmetrize_full!(prog :: Program, symsets...)
     n = length(symsets[1])
     if n < 2 return end
         
-    transpose = Dict{Symbol,Symbol}()
-    for set in symsets
-        transpose[set[1]] = set[2]
-        transpose[set[2]] = set[1]
-    end
-    symmetrize!(prog, transpose)
+    symmetrize!(prog, Dict{Symbol,Symbol}(set[1] => set[2], set[2] => set[1]))
 
     if n >= 3
         symmetrize_cyclic!(prog, symsets...)

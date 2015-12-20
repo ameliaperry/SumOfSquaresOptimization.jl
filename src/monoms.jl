@@ -11,36 +11,24 @@ typealias SoSPoly Dict{SoSMonom,Float64}
 
 one = Dict{Symbol,Int64}() :: SoSMonom
 
-
-
-#  Multiplication of polynomials.
-#    there should be a faster sum here that manages iterators, a la mergesort
-function *(a::SoSMonom, b::SoSMonom)
-    # A, including overlap with B
-    map = Dict([ k => (v + get(b,k,0)) for (k,v) in a ]) :: SoSMonom
-    # B \ A
-    for (k,v) in b
-        if(! haskey(a,k))
-            map[k] = v
+#    there should be a faster option here that manages iterators, a la mergesort
+macro dictplus(a, b)
+    quote
+        # A, including overlap with B
+        map = Dict([ k => v + get(b,k,0) for (k,v) in a ])
+        # B \ A
+        for (k,v) in b
+            if !haskey(a,k)
+                map[k] = v
+            end
         end
+        map
     end
-    return map
 end
 
-#  Addition of polynomials
-#    there should be a faster sum here that manages iterators, a la mergesort
-#    also, this is the same code as multiplication of SosMonoms -- make non-redundant
-function +(a::SoSPoly, b::SoSPoly)
-    # A, including overlap with B
-    map = Dict([ k => (v + get(b,k,0)) for (k,v) in a ]) :: SoSPoly
-    # B \ A
-    for (k,v) in b
-        if(! haskey(a,k))
-            map[k] = v
-        end
-    end
-    return map
-end
+#  Multiplication of monomials.
+*(a::SoSMonom,b::SoSMonom) = @dictplus(a,b)
++(a::SoSPoly,b::SoSPoly) = @dictplus(a,b)
 
 #  Addition in-place of polynomials
 function addpoly!(a::SoSPoly, b::SoSPoly)
@@ -49,11 +37,8 @@ function addpoly!(a::SoSPoly, b::SoSPoly)
     end
 end
 
-
-#  Multiplication of polynomials
-#    just the naive method
+#  Multiplication of polynomials -- just the naive method
 function *(a::SoSPoly, b::SoSPoly)
-    # there are maybe more efficient ways to do this
     map = SoSPoly()
     for (k1,v1) in a
         for (k2,v2) in b
@@ -66,25 +51,17 @@ end
 
 #  Degree of monomial / polynomial
 deg(m :: SoSMonom) = sum(values(m))
-deg(p :: SoSPoly) = length(p) == 0 ? 0 : maximum([deg(k) for (k,v) in p]) 
+deg(p :: SoSPoly) = (length(p) == 0) ? 0 : maximum([deg(k) for (k,v) in p]) 
 
 
 #  Enumerate all monomials of degree d.
 #    Julia knows about combinations (without replacement), and we
 #    want to choose variables with replacement. We simulate this
 #    via (v+d-1 choose d).
-function monoms(varr :: Array{Symbol}, d :: Int64)
-    v = length(varr)
-#    [combToMonom(varr,co) for co in combinations([1:(v+d-1)],d)]
-    [combToMonom(varr,co) for co in combinations(1:(v+d-1),d)]
-end
-function monoms(d :: Int64) # edge case
-    if (d == 0)
-        return [Dict{Symbol,Int64}()]
-    else
-        return []
-    end
-end
+monoms(varr :: Array{Symbol}, d :: Int64) =
+    [ combToMonom(varr,co) for co in combinations(1:(length(varr)+d-1),d) ] :: Array{SoSMonom,1}
+monoms(d :: Int64) = (d == 0) ? [SoSMonom()] : Array{SoSMonom,1}() # edge case
+
 function combToMonom(varr :: Array{Symbol}, co :: Array{Int64})
     m = Dict{Symbol,Int64}() :: SoSMonom
     shift = 0
@@ -95,7 +72,6 @@ function combToMonom(varr :: Array{Symbol}, co :: Array{Int64})
     end
     m
 end
-
 
 
 # Find all decompositions of mon into two monomials (m1,m2), each of degree
