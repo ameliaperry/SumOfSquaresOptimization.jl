@@ -1,6 +1,7 @@
 module SumOfSquaresOptimization
 import Base.Operators: +, *
 using DataStructures # for SortedDict, for row-redundancy checks
+import DataStructures: status # annoying that we have to overload this with a different meaning
 
 # sos.jl
 export Program
@@ -13,7 +14,7 @@ export sossolve
 
 # solution.jl
 export SoSSolution
-export dumpsol, obj, primalobj, dualobj
+export dumpsol, obj, primalobj, dualobj, status
 export moment, @moment
 
 # symmetrize.jl

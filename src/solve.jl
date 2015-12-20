@@ -125,12 +125,12 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
             end
         end
 
-        # XXX we have to specify width `length(revomap)` in case higher moments /
-        # orbits don't show up in the promoted constraints. In principle,
-        # though, it'd make the linear algebra faster to exclude these columns,
-        # and manually re-include them after the linear algebra. At some point we
-        # should do this; we can also reduce columns by joining orbits by
-        # equality constraints (e.g. boolean constraints)
+        # we have to specify width `length(revomap)` in case higher moments /
+        # orbits don't show up in the promoted constraints. 
+        # XXX In principle, though, it'd make the linear algebra faster to
+        # exclude these columns, and manually re-include them after the linear
+        # algebra. At some point we should do this; we can also reduce columns
+        # by joining orbits by equality constraints (e.g. boolean constraints)
         C = sparse(CI,CJ,CV,i-1,length(revomap))
     end
     @printf("Size of C is %s\n", size(C))
@@ -228,18 +228,24 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
     # solve the SDP
     println("Solving SDP with $(sdp.nmoments)^2 entries and $(sdp.nconstraints) constraints") 
-    @time sol = sdp_solve(sdp,call=call)
+    @time sdpsol = sdp_solve(sdp,call=call)
 
 
     # build & return a solution object
     @timeifdebug "Building solution object" begin
+        if sdpsol.status == :Infeasible
+            return sos_sol_unbounded(prog,d)
+        elseif sdpsol.status == :Unbounded
+            return sos_sol_infeasible(prog,d)
+        end
         moments = Dict{SoSMonom,Float64}()
         for i in 1:length(mon0d2)
             for j in i:length(mon0d2)
-                moments[mon0d2[i]*mon0d2[j]] = sol.primalmatrix[i,j]
+                moments[mon0d2[i]*mon0d2[j]] = sdpsol.primalmatrix[i,j]
             end
         end
-        SoSSolution(prog, d, sol.primalobj, sol.dualobj, moments, sol.primalmatrix, sol.dualmatrix)
+        status = sdpsol.status == :Infeasible ? :Unbounded : sdpsol.status == :Unbounded ? :Infeasible : sdpsol.status
+        SoSSolution(prog, d, sdpsol.primalobj, sdpsol.dualobj, moments, sdpsol.primalmatrix, sdpsol.dualmatrix, status)
     end
 end
 

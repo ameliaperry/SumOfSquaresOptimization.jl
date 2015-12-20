@@ -1,10 +1,32 @@
 
-
 # procedure for SDP, *in this order*:
 # instantiate SDPSession(nconstraints, nmoments)
 # call sdp_obj! a bunch of times in order to set objective
 # call sdp_con! a bunch of times (in any order) to set constraints)
 # call sdp_solve to return a solution
+
+
+# solution structure & methods
+type SDPSolution
+    primalobj :: Float64
+    dualobj :: Float64
+    primalmatrix :: Array{Float64,2}
+    dualmatrix :: Array{Float64,2}
+    status :: Symbol # :Normal, :Infeasible, :Unbounded, :Warning, :Error
+end
+
+function sdp_sol_infeasible(maximize :: Bool)
+    obj = maximize ? -Inf : Inf
+    SDPSolution(obj, obj, zeros(0,0), zeros(0,0), :Infeasible)
+end
+
+function sdp_sol_unbounded(maximize :: Bool)
+    obj = maximize ? Inf : -Inf
+    SDPSolution(obj, obj, zeros(0,0), zeros(0,0), :Unbounded)
+end
+
+
+
 
 type SDPSession
     maximize :: Bool
@@ -18,14 +40,6 @@ type SDPSession
     io :: IO
 end
 SDPSession(maximize, nconstraints, nmoments, offset) = SDPSession(maximize, nmoments, spzeros(nmoments,nmoments), nconstraints, nconstraints, Float64[], offset, sdp_init(nconstraints,nmoments)...)
-
-type SDPSolution
-    primalobj :: Float64
-    dualobj :: Float64
-    primalmatrix :: Array{Float64,2}
-    dualmatrix :: Array{Float64,2}
-    retcode :: Int
-end
 
 function sdp_init(nconstraints, nmoments)
     fname,io = mktemp()
@@ -55,29 +69,30 @@ function sdp_con!(sess :: SDPSession, con :: Int64, i :: Int64, j :: Int64, val 
 end
 
 
-csdp_messages = [
-    "Success, but the problem is primal infeasible.",
-    "Success, but the problem is dual infeasible.",
-    "Partial success: full accuracy was not achieved.",
-    "Failure: maximum iterations reached.",
-    "Failure: stuck at edge of primal infeasibility.",
-    "Failure: stuck at edge of dual infeasibility.",
-    "Failure: lack of progress.",
-    "Failure: X, Z, or O was singular.",
-    "Failure: detected NaN on Inf values."
+retcode_to_status = [
+    :Unbounded, #"Success, but the problem is primal infeasible.",
+    :Infeasible, #"Success, but the problem is dual infeasible.",
+    :Warning, #"Partial success: full accuracy was not achieved.",
+    :Error, #"Failure: maximum iterations reached.",
+    :Error, #"Failure: stuck at edge of primal infeasibility.",
+    :Error, #"Failure: stuck at edge of dual infeasibility.",
+    :Error, #"Failure: lack of progress.",
+    :Error, #"Failure: X, Z, or O was singular.",
+    :Error, #"Failure: detected NaN on Inf values."
 ]
 
 function sdp_solve(sess :: SDPSession; call="csdp")
     close(sess.io)
 
-    if sess.nconstraints == 0
+    # First handle totally unconstrained SDPs -- these throw an error in CSDP.
+    # The dual matrix is totally constrained to minus `initval` -- check if this is PSD.
+    if sess.nconstraints == 0 
         eigmin = eigs(-sess.initval; nev=1, which=:SR)[1][1] # least eigenvalue
-        if eigmin > -1e-9 # feasible
+        if eigmin > -1e-9 # initial value is PSD, feasible
             return SDPSolution(sess.offset,sess.offset,full(-sess.initval),zeros(sess.nmoments,sess.nmoments),0)
         else # infeasible
-            println("Program is infeasible.")
-            obj = sess.maximize ? -Inf : Inf
-            return SDPSolution(obj,obj,zeros(sess.nmoments,sess.nmoments),zeros(sess.nmoments,sess.nmoments),1)
+            println("The SDP is infeasible.")
+            return sdp_unbounded(sess.maximize)
         end
     end
 
@@ -100,15 +115,11 @@ function sdp_solve(sess :: SDPSession; call="csdp")
             end
 
         elseif startswith(l, "Success: SDP is primal infeasible")
-            primalobj = dualobj = sess.maximize ? Inf : -Inf
-            retcode = 1
-            println("The program is dual infeasible.")
-        
+            println("The SDP is infeasible.")
+            return sdp_sol_infeasible(sess.maximize)
         elseif startswith(l, "Success: SDP is dual infeasible")
-            primalobj = dualobj = sess.maximize ? -Inf : Inf
-            retcode = 2
-            println("The program is primal infeasible.")
-
+            println("The SDP is unbounded.")
+            return sdp_sol_unbounded(sess.maximize)
         end
     end
 
@@ -133,9 +144,9 @@ function sdp_solve(sess :: SDPSession; call="csdp")
     # compute objective
     if retcode != 1 && retcode != 2
         primalobj = dot(dualvector, sess.objective) + sess.offset
-        dualobj = primalobj # XXX this is no good. should we take the truncated CSDP output?
+        dualobj = primalobj # XXX this is no good -- want to know the duality gap.
     end
 
-    SDPSolution(primalobj, dualobj, primalmatrix, dualmatrix, retcode)
+    SDPSolution(primalobj, dualobj, primalmatrix, dualmatrix, retcode==0 ? :Normal : retcode_to_status[retcode])
 end
 

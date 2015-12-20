@@ -9,11 +9,36 @@ type SoSSolution
     moments :: Dict{SoSMonom,Float64}
     primalmatrix :: Array{Float64,2}
     dualmatrix :: Array{Float64,2}
+    status :: Symbol # :Normal, :Infeasible, :Unbounded, :Warning, :Error
 end
 
 obj(sol :: SoSSolution) = sol.primalobj
 primalobj(sol :: SoSSolution) = sol.primalobj
 dualobj(sol :: SoSSolution) = sol.dualobj
+status(sol :: SoSSolution) = sol.status
+
+function sos_sol_infeasible(prog :: Program, deg :: Int)
+    obj = prog.maximize ? -Inf : Inf
+    SoSSolution(prog,deg,obj,obj,Dict{SoSMonom,Float64}(),zeros(0,0),zeros(0,0),:Infeasible)
+end
+function sos_sol_unbounded(prog :: Program, deg :: Int)
+    obj = prog.maximize ? Inf : -Inf
+    SoSSolution(prog,deg,obj,obj,Dict{SoSMonom,Float64}(),zeros(0,0),zeros(0,0),:Unbounded)
+end
+
+
+
+function badsol_check(sol :: SoSSolution)
+    if sol.status == :Unbounded
+        throw(ArgumentError("The program was unbounded."))
+    elseif sol.status == :Infeasible
+        throw(ArgumentError("The program was infeasible."))
+    elseif sol.status == :Error
+        throw(ArgumentError("There was an error in solving the program."))
+    elseif sol.status == :Warning
+        println("Warning: the SDP solution was abnormal in some way.")
+    end
+end
 
 
 # Extracts moments from a solution.
@@ -24,9 +49,8 @@ function moment(sol :: SoSSolution, monom :: SoSMonom)
        throw(ArgumentError("Requested moment degree is higher than solution degree"))
     elseif !haskey(sol.moments, monom)
        throw(ArgumentError("Requested moment is not described by this SoS solution"))
-    elseif isinf(sol.primalobj)
-        throw(ArgumentError("The program was infeasible -- moments are not available."))
     end
+    badsol_check(sol)
 
     sol.moments[monom]
 end
@@ -34,7 +58,7 @@ end
 moment(sol :: SoSSolution, poly :: SoSPoly) = sum([ moment(sol,monom) * coeff for (monom,coeff) in poly ])
 moment(sol :: SoSSolution, poly :: Expr) = moment(sol, parsepoly(nothing, poly))
 moment(sol :: SoSSolution, symb :: Symbol) = moment(sol, parsepoly(nothing, symb))
-
+moment(sol :: SoSSolution, str :: AbstractString) = moment(sol, parse(str))
 macro moment(sol, args...)
     escargs = [esc(x) for x in args[2:end]]
     quote
@@ -141,6 +165,7 @@ end
 
 # Dumps a solution to stdout.
 function dumpsol(sol :: SoSSolution)
+    badsol_check(sol)
     println("Objective:")
     println(sol.primalobj)
     println("Moments:")

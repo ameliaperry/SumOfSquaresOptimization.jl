@@ -39,14 +39,19 @@ p = Dict(a=>1.0, b=>2.0)
 prog = Program(minimize=true)
 objective(prog, "x^2 + y^2 - 1")
 sol = sossolve(prog,2)
+@test status(sol) == :Normal
 @test abs(primalobj(sol) + 1) < objtol
+@test_throws ArgumentError moment(sol,"x^4")
 
 # unconstrained, unbounded maximization
 prog = Program(maximize=true)
 objective(prog, "x^2 + y^2 - 1")
 sol = sossolve(prog,2)
+@test status(sol) == :Unbounded
 @test isinf(primalobj(sol))
 @test !signbit(primalobj(sol))
+@test_throws ArgumentError moment(sol,"x")
+@test_throws ArgumentError dumpsol(sol)
 
 # min bisection in the 6-cycle
 prog = Program(minimize=true)
@@ -61,13 +66,16 @@ end
 @partconstraint(prog, :bisect, "-%d", 6/2)
 
 sol = sossolve(prog,2)
+@test status(sol) == :Normal
 @test abs(primalobj(sol) - 1.5) < objtol
 
 # test dihedral symmetry on the same program
 symmetrize_dihedral!(prog, [symbol("x$i") for i in 1:6])
 sol = sossolve(prog,2)
+@test status(sol) == :Normal
 @test abs(primalobj(sol) - 1.5) < objtol
 sol = sossolve(prog,4)
+@test status(sol) == :Normal
 @test abs(primalobj(sol) - 2.0) < objtol
 
 
