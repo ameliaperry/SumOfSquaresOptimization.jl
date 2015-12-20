@@ -9,8 +9,6 @@ typealias SoSMonom Dict{Symbol,Int64}
 #  An SoSPoly maps each monomial to its coefficient.
 typealias SoSPoly Dict{SoSMonom,Float64}
 
-one = Dict{Symbol,Int64}() :: SoSMonom
-
 #    there should be a faster option here that manages iterators, a la mergesort
 macro dictplus(a, b)
     quote
@@ -79,7 +77,7 @@ end
 # XXX currently unused
 function decomp(mon :: SoSMonom, degmax :: Int64)
     # maybe there's room for improvement here ...
-    list = (SoSMonom,SoSMonom)[]
+    list = Tuple{SoSMonom,SoSMonom}[]
     varr = [k for (k,v) in mon]
     
     # for each candidate m1, see if its complement m2 is sensible

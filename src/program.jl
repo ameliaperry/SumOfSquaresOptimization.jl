@@ -30,7 +30,7 @@ typealias Maybe{T} Union{T,Void}
 #  Parse a polynomial (in Expr form) into a SoSPoly, by traversing
 #    a Julia syntax tree.
 
-parsepoly{T<:Number}(prog :: Maybe{Program}, ex :: T) = Dict( one => convert(Float64, ex) ) :: SoSPoly
+parsepoly{T<:Number}(prog :: Maybe{Program}, ex :: T) = Dict( SoSMonom() => convert(Float64, ex) ) :: SoSPoly
 
 function parsepoly(prog :: Maybe{Program}, ex::Symbol)
     prog == nothing || push!(prog.vars, ex)
@@ -121,10 +121,8 @@ function perturb_objective_sparse(prog,tol,s,deg)
     mon = [ monoms(prog,i) for i in 0:deg ]
     mon = vcat(mon...)
     for i in 1:s
-        idx = rand(1:length(mon))
-        m = mon[idx]
-        poly = Dict( m => tol * randn() ) :: SoSPoly
-        prog.objective += poly
+        m = rand(mon)
+        prog.objective += Dict( m => tol*randn() )
     end
 end
 

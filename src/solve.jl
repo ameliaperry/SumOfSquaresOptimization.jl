@@ -74,7 +74,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         # XXX we're not getting any mileage out of the sparsity here. Fix this.
         # We should be able to at least find `initial` using sparse QR, even if
         # we can't find the nullspace in a sparse-friendly way.
-        C = zeros(length(rows),length(revomap))
+        C = spzeros(length(rows),length(revomap))
         for i in 1:length(rows)
             for (j,v) in rows[i]
                 C[i,j] = v
@@ -119,7 +119,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
     # find an initial solution for moments (not necessarily PSD)
     @printf("Computing initial value -- ")
     @time if size(C,1) > 0
-        initial = vec(C \ Cconst)
+        initial = vec(C \ full(Cconst))
         # test that this is actually a solution
         if norm(Cconst - C * initial) > 1e-6
             #  XXX TODO
@@ -131,7 +131,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
     # compute the nullspace
     @printf("Computing ideal basis -- ")
-    @time B = nullspace(C)
+    @time B = nullspace(full(C))
 
 
     # we will need to adjust our objective by the following constant term, which is missing from the SDP
