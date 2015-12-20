@@ -1,5 +1,6 @@
 module SumOfSquaresOptimization
 importall Base.Operators
+using DataStructures # for SortedDict, for row-redundancy checks
 
 # sos.jl
 export Program

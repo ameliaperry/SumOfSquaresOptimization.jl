@@ -2,6 +2,57 @@
 ###### Solving ######
 #####################
 
+sosdebug = false
+
+macro timeifdebug(str,ex)
+    if sosdebug
+        quote
+            @printf("%s -- ", $(esc(str)))
+            @time $(esc(ex))
+        end
+    else
+        quote $(esc(ex)) end
+    end
+end
+
+function row_redundancy_object(wid)
+    randproj = rand(1,wid)
+    rowsd = SortedDict(Dict{Float64,SparseMatrixCSC{Float64,Int64}}())
+    (randproj, rowsd)
+end
+
+function row_redundancy_check(redobj, row)
+    (randproj, rowsd) = redobj
+    rval = (randproj * row)[1,1]
+    
+    st = searchsortedfirst(rowsd,rval)
+    while status((rowsd,st)) == 1
+        (k,v) = deref((rowsd,st))
+        if k - rval > 1e-7
+            break
+        end
+        if norm(v - row) < 1e-7
+            return false
+        end
+        st = advance((rowsd,st))
+    end
+    
+    st = searchsortedlast(rowsd,rval)
+    while status((rowsd,st)) == 1
+        (k,v) = deref((rowsd,st))
+        if rval - k > 1e-7
+            break
+        end
+        if norm(v - row) < 1e-7
+            return false
+        end
+        st = regress((rowsd,st))
+    end
+
+    rowsd[rval] = row
+    true
+end
+
 
 #  Make the magic happen.
 function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
@@ -18,74 +69,68 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
     end
 
 
-    @printf("Enumerating monomials -- ")
-    @time begin
+    @timeifdebug "Enumerating monomials" begin
         # choose an order for indexing non-1 monomials
         monall = [ monoms(prog,i) for i in 0:d ]
         mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 0 to d/2
     end
 
     
-    @printf("Symmetrizing monomials -- ")
-    @time omap, revomap = monom_orbits(vcat(monall...), prog.symmetries)
+    @timeifdebug "Symmetrizing monomials" begin
+        omap, revomap = monom_orbits(vcat(monall...), prog.symmetries)
+    end
 
 
-    @printf("Writing constraint-by-orbit matrix -- ")
-    @time begin
-        # write the (sparse) constraint-by-orbit occurence matrix C
-        rows = Dict{Int64,Float64}[]
+    @timeifdebug "Writing constraint-by-orbit matrix" begin
+        # choose a random projection for testing row redundancy
+
+        # write the (sparse) constraint-by-orbit occurence matrix C, removing redundant constraints
+        CI = Array{Int64,1}()
+        CJ = Array{Int64,1}()
+        CV = Array{Float64,1}()
+        redund = row_redundancy_object(length(revomap))
+        i = 1
         for poly in prog.constraints
             pd = deg(poly)
-            if(pd > d)
-                @printf("Warning: a constraint has degree %d, larger than solution degree %d",pd,d)
+            if pd > d
+                println("Warning: a constraint has degree $pd, larger than relaxation degree $d")
             end
 
             # promote to higher degree in all possible ways
             for promdeg in 0:(d-pd)
                 for monom in monall[promdeg+1] # +1 because monall is an array indexed from 1
 
-                    row = Dict{Int64,Float64}()
+                    row = spzeros(length(revomap),1)
                     for (k,v) in poly
                         key = omap[k*monom]
-                        row[key] = v + get(row,key,0.0)
+                        row[key,1] = v + get(row,key,0.0)
                     end
 
                     # only add this row if it's actually new
-                    # XXX this is currently a source of inefficiency! can we improve
-                    # this without resorting to a full nearest-neighbor data structure?
-                    # maybe keep a set of constraints, exploiting the fact that duplicated rows will
-                    # probably be bit-equal, not just epsilon-close, and that we don't have
-                    # to be perfect about removing redundancies...
-                    if !any(o -> rowdist(row,o) < 1e-8, rows)
-                        push!(rows,row)
+                    if row_redundancy_check(redund, row)
+                        rv = rowvals(row)
+                        append!(CI,fill(i,length(rv)))
+                        append!(CJ,rv)
+                        append!(CV,nonzeros(row))
+                        i += 1
                     end
 
                 end
             end
         end
 
-        # transcribe the rows to a matrix
         # XXX we have to specify width `length(revomap)` in case higher moments /
         # orbits don't show up in the promoted constraints. In principle,
         # though, it'd make the linear algebra faster to exclude these columns,
         # and manually re-include them after the linear algebra. At some point we
         # should do this; we can also reduce columns by joining orbits by
         # equality constraints (e.g. boolean constraints)
-        # XXX we're not getting any mileage out of the sparsity here. Fix this.
-        # We should be able to at least find `initial` using sparse QR, even if
-        # we can't find the nullspace in a sparse-friendly way.
-        C = spzeros(length(rows),length(revomap))
-        for i in 1:length(rows)
-            for (j,v) in rows[i]
-                C[i,j] = v
-            end
-        end
+        C = sparse(CI,CJ,CV,i-1,length(revomap))
     end
     @printf("Size of C is %s\n", size(C))
 
 
-    @printf("Manipulating data structures -- ")
-    @time begin
+    @timeifdebug "Manipulating data structures" begin
         # write our objective in moments
         O = zeros(length(revomap))
         for (k,v) in prog.objective
@@ -93,8 +138,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         end
 
         # separate the constant column from the rest
-#        Cconst = full(C[:,1])
-#        C = full(C[:,2:end])
         Cconst = C[:,1]
         C = C[:,2:end]
         Oconst = O[1]
@@ -104,8 +147,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
     end
 
 
-    @printf("Precomputing decomposition-to-orbit map -- ")
-    @time begin
+    @timeifdebug "Precomputing decomposition-to-orbit map" begin
         domap = Dict{Tuple{Int64,Int64},Int64}()
         for a in 1:length(mon0d2)
             for b in max(a,2):length(mon0d2)
@@ -117,8 +159,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
     
     
     # find an initial solution for moments (not necessarily PSD)
-    @printf("Computing initial value -- ")
-    @time if size(C,1) > 0
+    @timeifdebug "Computing initial value" if size(C,1) > 0
         initial = vec(C \ full(Cconst))
         # test that this is actually a solution
         if norm(Cconst - C * initial) > 1e-6
@@ -130,8 +171,9 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
 
     # compute the nullspace
-    @printf("Computing ideal basis -- ")
-    @time B = nullspace(full(C))
+    @timeifdebug "Computing ideal basis" begin
+        B = nullspace(full(C))
+    end
 
 
     # we will need to adjust our objective by the following constant term, which is missing from the SDP
@@ -165,7 +207,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
             end
         end
     end
-    @printf("Initial value: wrote %d of %d, density %f\n", big, tot, big/tot)
+    println("Initial value: density $(big/tot)")
 
 
     # dual constraints = primal building-blocks
@@ -186,22 +228,22 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
             end
         end
 
-        @printf("done %d/%d constraints. wrote %d of %d, density %f\n", i, size(B,2), big, tot, big/tot)
+        println("done $i/$(size(B,2)) constraints, density $(big/tot)")
     end
 
 
     # free some memory
-    C = Cconst = O = Oconst = B = initial = monall = mond = mondrev = omap = revomap = domap = 0 # free some memory
+    C = Cconst = O = Oconst = B = initial = monall = mond = mondrev = omap = revomap = domap = 0
 
 
     # solve the SDP
-    @printf("Solving SDP with %d^2 entries and %d constraints... ", sdp.nmoments, sdp.nconstraints)
-    @time sol = sdp_solve(sdp,call=call)
+    @timeifdebug "Solving SDP with $(sdp.nmoments)^2 entries and $(sdp.nconstraints) constraints" begin
+        sol = sdp_solve(sdp,call=call)
+    end
 
 
     # build & return a solution object
-    @printf("Building solution object -- ")
-    @time begin
+    @timeifdebug "Building solution object" begin
         moments = Dict{SoSMonom,Float64}()
         for i in 1:length(mon0d2)
             for j in i:length(mon0d2)
