@@ -39,6 +39,7 @@ The following will solve a polynomial system and access a solution:
 * `dumpsol(sol)` outputs the objective, moments, and dual matrix to `stdout`. These will be more readable in the future.
 * `@moment(sol, fmt, ...)` outputs the pseudo-expectation of the given polynomial, specified in `printf` style.
 * `primalobj(sol)` and `dualobj(sol)` return the objective values (which are hopefully equal).
+* `status(sol)` returns the solution status: `:Normal`, `:Infeasible`, `:Unbounded`, `:Warning`, or `:Error`.
 
 The following functions provide symmetry hints, enabling faster solution and ensuring symmetric moments:
 * `symmetrize!(prog, perms)`, where `perms` is a `Dict{Symbol,Symbol}` encoding a permutation, or a collection of these. Only generators need to be specified, not the full permutation group.
