@@ -167,8 +167,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         initial = vec(C \ full(Cconst))
         # test that this actually satisfies constraints. if not, declare infeasibility
         if norm(Cconst - C * initial) > 1e-6
-
-            #  XXX TODO
+            return sos_sol_infeasible(prog,d)
         end
     else
         initial = zeros(size(C,2))
