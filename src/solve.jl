@@ -15,6 +15,14 @@ macro timeifdebug(str,ex)
     end
 end
 
+
+# The row-redundancy test works as follows: we choose a random 1-d projection,
+# and keep a dictionary of existing rows sorted by their value in that 1-d
+# projection. Each time we get a new row, we take its value in that projection
+# and fully compare that row with the projection-nearby rows. This should result in
+# very few superfluous full-row comparisons.
+# In order to get the nearby rows as indexed by projection value, we use the SortedDict
+# type from DataStructures.jl.
 function row_redundancy_object(wid)
     randproj = rand(1,wid)
     rowsd = SortedDict(Dict{Float64,SparseMatrixCSC{Float64,Int64}}())
@@ -82,8 +90,6 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
 
     @timeifdebug "Writing constraint-by-orbit matrix" begin
-        # choose a random projection for testing row redundancy
-
         # write the (sparse) constraint-by-orbit occurence matrix C, removing redundant constraints
         CI = Array{Int64,1}()
         CJ = Array{Int64,1}()
@@ -102,11 +108,11 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
                     row = spzeros(length(revomap),1)
                     for (k,v) in poly
-                        key = omap[k*monom]
-                        row[key,1] = v + get(row,key,0.0)
+                        orbit = omap[k*monom]
+                        row[orbit,1] += v 
                     end
 
-                    # only add this row if it's actually new
+                    # add this row, but only if it's actually new
                     if row_redundancy_check(redund, row)
                         rv = rowvals(row)
                         append!(CI,fill(i,length(rv)))
@@ -142,27 +148,26 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         C = C[:,2:end]
         Oconst = O[1]
         O = O[2:end]
-        # XXX omap
         revomap = revomap[2:end]
-    end
-
-
-    @timeifdebug "Precomputing decomposition-to-orbit map" begin
+        
+        # decomposition-to-orbit map
         domap = Dict{Tuple{Int64,Int64},Int64}()
         for a in 1:length(mon0d2)
             for b in max(a,2):length(mon0d2)
                 domap[(a,b)] = omap[mon0d2[a]*mon0d2[b]]-1
             end
         end
-    end
 
+        omap = 0 # done with this
+    end
     
     
-    # find an initial solution for moments (not necessarily PSD)
+    # find an initial solution for moments -- satisfying affine constraints, but not necessarily PSD
     @timeifdebug "Computing initial value" if size(C,1) > 0
         initial = vec(C \ full(Cconst))
-        # test that this is actually a solution
+        # test that this actually satisfies constraints. if not, declare infeasibility
         if norm(Cconst - C * initial) > 1e-6
+
             #  XXX TODO
         end
     else
@@ -171,6 +176,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
 
     # compute the nullspace
+    # XXX really want to do this in a sparse way, from the QR decomposition of B
     @timeifdebug "Computing ideal basis" begin
         B = nullspace(full(C))
     end
@@ -184,62 +190,45 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
 
     # write objective value
-    @printf("Writing objective -- ")
-    @time for i in 1:size(B,2)
-        sdp_obj!(sdp, dot(O, B[:,i]))
+    @timeifdebug "Writing objective -- " begin
+        for i in 1:size(B,2)
+            sdp_obj!(sdp, dot(O, B[:,i]))
+        end
     end
 
 
     # dual objective = primal constant-term
-    # XXX TMP
-    big = 0
-    tot = 0
-
-    @printf("Writing initial value -- ")
-    @time begin
+    @timeifdebug "Writing initial value -- " begin
         sdp_con!(sdp, 0, 1, 1, -1.0)
         for ((a,b),orbit) in domap
             val = initial[orbit]
-            tot += 1
             if(abs(val) > 1e-8)
-                big += 1
                 sdp_con!(sdp, 0, a, b, val)
             end
         end
     end
-    println("Initial value: density $(big/tot)")
-
 
     # dual constraints = primal building-blocks
-    # XXX TMP
-    big = 0
-    tot = 0
-
-    @printf("Writing ideal basis -- ")
-    @time for i in 1:size(B,2)
-        
-        # rewrite B[:,i] as a matrix in d/2 x d/2 moment decompositions
-        for ((a,b),orbit) in domap
-            val = B[orbit,i]
-            tot += 1
-            if(abs(val) > 1e-8)
-                big += 1
-                sdp_con!(sdp, i, a, b, val)
+    @timeifdebug "Writing ideal basis -- " begin
+        for i in 1:size(B,2)
+            # rewrite B[:,i] as a matrix in d/2 x d/2 moment decompositions
+            for ((a,b),orbit) in domap
+                val = B[orbit,i]
+                if(abs(val) > 1e-8)
+                    sdp_con!(sdp, i, a, b, val)
+                end
             end
         end
-
-        println("done $i/$(size(B,2)) constraints, density $(big/tot)")
     end
 
 
     # free some memory
-    C = Cconst = O = Oconst = B = initial = monall = mond = mondrev = omap = revomap = domap = 0
+    C = Cconst = O = Oconst = B = initial = monall = mond = mondrev = revomap = domap = 0
 
 
     # solve the SDP
-    @timeifdebug "Solving SDP with $(sdp.nmoments)^2 entries and $(sdp.nconstraints) constraints" begin
-        sol = sdp_solve(sdp,call=call)
-    end
+    println("Solving SDP with $(sdp.nmoments)^2 entries and $(sdp.nconstraints) constraints") 
+    @time sol = sdp_solve(sdp,call=call)
 
 
     # build & return a solution object

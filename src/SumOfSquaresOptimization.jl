@@ -1,5 +1,5 @@
 module SumOfSquaresOptimization
-importall Base.Operators
+import Base.Operators: +, *
 using DataStructures # for SortedDict, for row-redundancy checks
 
 # sos.jl
