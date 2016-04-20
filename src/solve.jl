@@ -2,13 +2,19 @@
 ###### Solving ######
 #####################
 
-sosdebug = false
+const sosdebug = true
 
+# NOTE: doesn't return the result of ex.
+# This allows ex to contain return statements.
 macro timeifdebug(str,ex)
     if sosdebug
         quote
             @printf("%s -- ", $(esc(str)))
-            @time $(esc(ex))
+            Libc.flush_cstdio()
+            tic()
+            $(esc(ex))
+            toc()
+            Libc.flush_cstdio()
         end
     else
         quote $(esc(ex)) end
@@ -32,7 +38,7 @@ end
 function row_redundancy_check(redobj, row)
     (randproj, rowsd) = redobj
     rval = (randproj * row)[1,1]
-    
+
     st = searchsortedfirst(rowsd,rval)
     while status((rowsd,st)) == 1
         (k,v) = deref((rowsd,st))
@@ -44,7 +50,7 @@ function row_redundancy_check(redobj, row)
         end
         st = advance((rowsd,st))
     end
-    
+
     st = searchsortedlast(rowsd,rval)
     while status((rowsd,st)) == 1
         (k,v) = deref((rowsd,st))
@@ -83,7 +89,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         mon0d2 = vcat( monall[ 1:(div(d,2)+1) ]... ) # monomials of degree from 0 to d/2
     end
 
-    
+
     @timeifdebug "Symmetrizing monomials" begin
         omap, revomap = monom_orbits(vcat(monall...), prog.symmetries)
     end
@@ -109,7 +115,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
                     row = spzeros(length(revomap),1)
                     for (k,v) in poly
                         orbit = omap[k*monom]
-                        row[orbit,1] += v 
+                        row[orbit,1] += v
                     end
 
                     # add this row, but only if it's actually new
@@ -126,7 +132,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         end
 
         # we have to specify width `length(revomap)` in case higher moments /
-        # orbits don't show up in the promoted constraints. 
+        # orbits don't show up in the promoted constraints.
         # XXX In principle, though, it'd make the linear algebra faster to
         # exclude these columns, and manually re-include them after the linear
         # algebra. At some point we should do this; we can also reduce columns
@@ -149,7 +155,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
         Oconst = O[1]
         O = O[2:end]
         revomap = revomap[2:end]
-        
+
         # decomposition-to-orbit map
         domap = Dict{Tuple{Int64,Int64},Int64}()
         for a in 1:length(mon0d2)
@@ -160,8 +166,8 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
         omap = 0 # done with this
     end
-    
-    
+
+
     # find an initial solution for moments -- satisfying affine constraints, but not necessarily PSD
     @timeifdebug "Computing initial value" if size(C,1) > 0
         initial = vec(C \ full(Cconst))
@@ -226,7 +232,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
 
 
     # solve the SDP
-    println("Solving SDP with $(sdp.nmoments)^2 entries and $(sdp.nconstraints) constraints") 
+    println("Solving SDP with $(sdp.nmoments)^2 entries and $(sdp.nconstraints) constraints")
     @time sdpsol = sdp_solve(sdp,call=call)
 
 
@@ -244,7 +250,7 @@ function sossolve(prog :: Program, d :: Int64; solver="csdp", call="csdp")
             end
         end
         status = sdpsol.status == :Infeasible ? :Unbounded : sdpsol.status == :Unbounded ? :Infeasible : sdpsol.status
-        SoSSolution(prog, d, sdpsol.primalobj, sdpsol.dualobj, moments, sdpsol.primalmatrix, sdpsol.dualmatrix, status)
+        return SoSSolution(prog, d, sdpsol.primalobj, sdpsol.dualobj, moments, sdpsol.primalmatrix, sdpsol.dualmatrix, status)
     end
 end
 
@@ -257,4 +263,3 @@ function halfrowdist(r1 :: Dict{Int64,Float64}, r2 :: Dict{Int64,Float64})
     end
     return dist
 end
-
