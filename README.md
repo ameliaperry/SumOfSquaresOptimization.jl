@@ -1,6 +1,6 @@
 # SumOfSquaresOptimization
 
-A Julia library to solve sum-of-squares relaxations of polynomial systems. This is not yet in the Julia package repository.
+A Julia library to solve sum-of-squares relaxations of polynomial systems. Development has ceased, in favor of the collaboration [SumOfSquares.jl](https://github.com/blegat/SumOfSquares.jl); see also [PolyJuMP.jl](https://github.com/blegat/PolyJuMP.jl). This is not in the Julia package repository. 
 
 ## example
 
@@ -50,10 +50,5 @@ The following functions provide symmetry hints, enabling faster solution and ens
 
 
 ## troubleshooting
-There are probably still a lot of issues with this code, and feel free to let me know about them. This package is in very early stages still.
-
-One issue I've encountered is that `csdp` doesn't seem to accept more than 23169 constraints in some compiled 32-bit versions. I've worked on reducing the number of constraints, so I expect this isn't too much of a barrier anymore. Hinting any symmetries of your program will reduce the number of SDP constraints handed to the solver.
-
-## todo
-See the GitHub issues section.
+There are probably still a lot of issues with this code. One issue I've encountered is that `csdp` doesn't seem to accept more than 23169 constraints in some compiled 32-bit versions. I've worked on reducing the number of constraints, so I expect this isn't too much of a barrier anymore. Hinting any symmetries of your program will reduce the number of SDP constraints handed to the solver.
 
